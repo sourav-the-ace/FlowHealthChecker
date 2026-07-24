@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Flow Scan Result</label>
+    <pluralLabel>Flow Scan Results</pluralLabel>
+    <nameField>
+        <type>AutoNumber</type>
+        <label>Result Number</label>
+        <displayFormat>RES-{0000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+</CustomObject>
