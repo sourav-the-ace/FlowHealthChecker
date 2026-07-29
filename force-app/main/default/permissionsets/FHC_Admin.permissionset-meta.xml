@@ -1,22 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
-    <label>Flow Health Checker Admin</label>
-    <description>Full access to Flow Health Checker — can run scans, view results and manage rules.</description>
-    <hasActivationRequired>false</hasActivationRequired>
-
-    <!-- API Enabled — required for Tooling API callouts -->
-    <userPermissions>
-        <enabled>true</enabled>
-        <name>ApiEnabled</name>
-    </userPermissions>
-
-    <!-- Apex Classes -->
     <classAccesses>
-        <apexClass>FlowScannerService</apexClass>
+        <apexClass>FlowHealthCheckerController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>FlowHealthCheckerController</apexClass>
+        <apexClass>FlowMetadataService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -24,76 +13,86 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>FlowMetadataService</apexClass>
+        <apexClass>FlowScannerService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-
-    <!-- Flow Scan object — full CRUD -->
+    <description>Full access to Flow Health Checker — can run scans, view results and manage rules.</description>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan_Result__c.Description__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan_Result__c.Element_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan_Result__c.Flow_Definition_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Error_Message__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Errors__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Affected_Flows__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Status__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Total_Flows_Scanned__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Total_Violations__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Flow_Scan__c.Warnings__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Flow Health Checker Admin</label>
     <objectPermissions>
-        <object>Flow_Scan__c</object>
-        <allowCreate>true</allowCreate>
-        <allowDelete>false</allowDelete>
-        <allowEdit>true</allowEdit>
-        <allowRead>true</allowRead>
-        <modifyAllRecords>false</modifyAllRecords>
-        <viewAllRecords>true</viewAllRecords>
-    </objectPermissions>
-
-    <!-- Flow Scan Result object — read and create -->
-    <objectPermissions>
-        <object>Flow_Scan_Result__c</object>
         <allowCreate>true</allowCreate>
         <allowDelete>false</allowDelete>
         <allowEdit>false</allowEdit>
         <allowRead>true</allowRead>
         <modifyAllRecords>false</modifyAllRecords>
+        <object>Flow_Scan_Result__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
-
-    <!-- Flow Scan fields -->
-    
-    <fieldPermissions>
-        <field>Flow_Scan__c.Total_Flows_Scanned__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Flow_Scan__c.Total_Violations__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Flow_Scan__c.Status__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Flow_Scan__c.Error_Message__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-
-    <!-- Flow Scan Result fields -->
-    
-    <fieldPermissions>
-        <field>Flow_Scan_Result__c.Element_Name__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Flow_Scan_Result__c.Description__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Flow_Scan_Result__c.Flow_Definition_Id__c</field>
-        <readable>true</readable>
-        <editable>true</editable>
-    </fieldPermissions>
-
-    <!-- LWC Tab access -->
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Flow_Scan__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
     <tabSettings>
         <tab>Flow_Scan__c</tab>
         <visibility>Available</visibility>
     </tabSettings>
+    <userPermissions>
+        <enabled>true</enabled>
+        <name>ApiEnabled</name>
+    </userPermissions>
 </PermissionSet>

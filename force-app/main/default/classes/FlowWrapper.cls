@@ -30,6 +30,9 @@ public class FlowWrapper {
         public Boolean isOnFaultPath     { get; set; }
         public String  rawValue          { get; set; }
         public String  objectName        { get; set; } // for Duplicate DML rule
+        public Integer fieldCount        { get; set; } // for Screen UX rule
+        public String  calledFlowApiName { get; set; } // for Recursive Subflow rule
+
 
         public FlowElementWrapper() {
             this.hasFaultConnector = false;

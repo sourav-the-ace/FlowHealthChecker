@@ -285,4 +285,96 @@ private class FlowHealthCheckerControllerTest {
         System.assert(rules.size() >= 5,
             'Should have at least 5 rules from Phase 1');
     }
+
+     @isTest
+    static void testGetScanHistory_ReturnsNewestFirst() {
+        Flow_Scan__c scan1 = new Flow_Scan__c(
+            Scan_Date__c            = DateTime.now().addDays(-2),
+            Status__c               = 'Complete',
+            Total_Flows_Scanned__c  = 10,
+            Total_Violations__c     = 3,
+            Errors__c               = 1,
+            Warnings__c             = 2
+        );
+        Flow_Scan__c scan2 = new Flow_Scan__c(
+            Scan_Date__c            = DateTime.now().addDays(-1),
+            Status__c               = 'Complete',
+            Total_Flows_Scanned__c  = 10,
+            Total_Violations__c     = 5,
+            Errors__c               = 3,
+            Warnings__c             = 2
+        );
+        Flow_Scan__c scan3 = new Flow_Scan__c(
+            Scan_Date__c            = DateTime.now(),
+            Status__c               = 'Complete',
+            Total_Flows_Scanned__c  = 12,
+            Total_Violations__c     = 1,
+            Errors__c               = 0,
+            Warnings__c             = 1
+        );
+        insert new List<Flow_Scan__c>{ scan1, scan2, scan3 };
+
+        Test.startTest();
+        List<Flow_Scan__c> history =
+            FlowHealthCheckerController.getScanHistory(null);
+        Test.stopTest();
+
+        System.assertEquals(3, history.size(),
+            'Should return all 3 completed scans');
+        System.assertEquals(scan3.Id, history[0].Id,
+            'Newest scan should be first');
+        System.assertEquals(scan1.Id, history[2].Id,
+            'Oldest scan should be last');
+    }
+
+    @isTest
+    static void testGetScanHistory_RespectsMaxRecords() {
+        List<Flow_Scan__c> scans = new List<Flow_Scan__c>();
+        for (Integer i = 0; i < 3; i++) {
+            scans.add(new Flow_Scan__c(
+                Scan_Date__c            = DateTime.now().addDays(-i),
+                Status__c               = 'Complete',
+                Total_Flows_Scanned__c  = 5,
+                Total_Violations__c     = i,
+                Errors__c               = i,
+                Warnings__c             = 0
+            ));
+        }
+        insert scans;
+
+        Test.startTest();
+        List<Flow_Scan__c> history =
+            FlowHealthCheckerController.getScanHistory(2);
+        Test.stopTest();
+
+        System.assertEquals(2, history.size(),
+            'Should respect the maxRecords limit of 2');
+    }
+
+    @isTest
+    static void testGetScanHistory_ExcludesIncompleteScans() {
+        Flow_Scan__c completeScan = new Flow_Scan__c(
+            Scan_Date__c            = DateTime.now(),
+            Status__c               = 'Complete',
+            Total_Flows_Scanned__c  = 5,
+            Total_Violations__c     = 1,
+            Errors__c               = 1,
+            Warnings__c             = 0
+        );
+        Flow_Scan__c runningScan = new Flow_Scan__c(
+            Scan_Date__c = DateTime.now(),
+            Status__c    = 'Running'
+        );
+        insert new List<Flow_Scan__c>{ completeScan, runningScan };
+
+        Test.startTest();
+        List<Flow_Scan__c> history =
+            FlowHealthCheckerController.getScanHistory(null);
+        Test.stopTest();
+
+        System.assertEquals(1, history.size(),
+            'Should only return Complete scans, not Running ones');
+        System.assertEquals(completeScan.Id, history[0].Id,
+            'The returned scan should be the completed one');
+    }
 }

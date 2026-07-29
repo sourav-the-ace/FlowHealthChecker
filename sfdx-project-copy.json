@@ -1,0 +1,29 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true,
+      "package": "Flow Health Checker",
+      "versionName": "ver 0.4",
+      "versionNumber": "0.4.0.NEXT",
+      "definitionFile": "config/project-scratch-def.json",
+      "postInstallScript": "FHCPostInstallScript",
+      "uninstallScript": "FHCUninstallHandler"
+    }
+  ],
+  "namespace": "svfhc",
+  "sourceApiVersion": "61.0",
+  "packageAliases": {
+    "Flow Health Checker": "0HodL0000005NNNSA2",
+    "Flow Health Checker@0.1.0-1": "04tdL000000hH8rQAE",
+    "Flow Health Checker@0.1.0-2": "04tdL000000hHFJQA2",
+    "Flow Health Checker@0.1.0-3": "04tdL000000hPKvQAM",
+    "Flow Health Checker@0.1.0-4": "04tdL000000hPrBQAU",
+    "Flow Health Checker@0.2.0-1": "04tdL000000hPsnQAE",
+    "Flow Health Checker@0.3.0-1": "04tdL000000hRMjQAM",
+    "Flow Health Checker@0.4.0-1": "04tdL000000hRcrQAE",
+    "Flow Health Checker@0.4.0-2": "04tdL000000ha9tQAA",
+    "Flow Health Checker@0.5.0-1": "04tdL000000hgFJQAY"
+  }
+}
+  

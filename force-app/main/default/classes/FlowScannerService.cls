@@ -11,7 +11,9 @@ public with sharing class FlowScannerService {
         'NoTriggerConfigRule'    => NoTriggerConfigRule.class,
         'UnusedVariableRule'     => UnusedVariableRule.class,
         'DuplicateDmlRule'       => DuplicateDmlRule.class,
-        'UnconnectedElementRule' => UnconnectedElementRule.class
+        'UnconnectedElementRule' => UnconnectedElementRule.class,
+        'TooManyScreenFieldsRule' => TooManyScreenFieldsRule.class,
+        'RecursiveSubflowRule'    => RecursiveSubflowRule.class
     };
 
     @AuraEnabled
@@ -74,32 +76,44 @@ public with sharing class FlowScannerService {
     }
 
     public static void persistScanResults(
-        Id scanId,
-        Integer totalFlows,
-        List<RuleViolation> violations
-    ) {
-        // Update header with totals
+    Id scanId,
+    Integer totalFlows,
+    List<RuleViolation> violations
+) {
+        Integer errorCount = 0;
+        Integer warningCount = 0;
+        Set<String> affectedFlowNames = new Set<String>();
+        for (RuleViolation v : violations) {
+            if (v.severity == 'Error') errorCount++;
+            else if (v.severity == 'Warning') warningCount++;
+            if (String.isNotBlank(v.flowApiName)) {
+                affectedFlowNames.add(v.flowApiName);
+            }
+        }
+
         update new Flow_Scan__c(
             Id                     = scanId,
             Total_Flows_Scanned__c = totalFlows,
-            Total_Violations__c    = violations.size()
+            Total_Violations__c    = violations.size(),
+            Errors__c              = errorCount,
+            Warnings__c            = warningCount,
+            Affected_Flows__c      = affectedFlowNames.size()
         );
 
-        // Bulk insert violation records
-        if (!violations.isEmpty()) {
-            List<Flow_Scan_Result__c> results = new List<Flow_Scan_Result__c>();
-            for (RuleViolation v : violations) {
-                results.add(new Flow_Scan_Result__c(
-                    Flow_Scan__c          = scanId,
-                    Flow_API_Name__c      = v.flowApiName,
-                    Rule_Name__c          = v.ruleName,
-                    Severity__c           = v.severity,
-                    Element_Name__c       = v.elementName,
-                    Description__c        = v.description,
-                    Flow_Definition_Id__c = v.flowDefinitionId
-                ));
-            }
-            insert results;
+    if (!violations.isEmpty()) {
+        List<Flow_Scan_Result__c> results = new List<Flow_Scan_Result__c>();
+        for (RuleViolation v : violations) {
+            results.add(new Flow_Scan_Result__c(
+                Flow_Scan__c          = scanId,
+                Flow_API_Name__c      = v.flowApiName,
+                Rule_Name__c          = v.ruleName,
+                Severity__c           = v.severity,
+                Element_Name__c       = v.elementName,
+                Description__c        = v.description,
+                Flow_Definition_Id__c = v.flowDefinitionId
+            ));
         }
+        insert results;
     }
+}
 }

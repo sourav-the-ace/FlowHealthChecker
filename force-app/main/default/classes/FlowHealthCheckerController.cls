@@ -46,4 +46,25 @@ public with sharing class FlowHealthCheckerController {
             ORDER BY svfhc__Severity__c ASC, MasterLabel ASC
         ];
     }
+    @AuraEnabled(cacheable=true)
+    public static List<Flow_Scan__c> getScanHistory(Integer maxRecords) {
+        if (!Schema.sObjectType.Flow_Scan__c.isAccessible()) {
+            throw new AuraHandledException(
+                'You do not have permission to view Flow Scan records.'
+            );
+        }
+
+        Integer lim = (maxRecords == null || maxRecords <= 0)
+            ? 20
+            : Math.min(maxRecords, 100); // governor-limit guard rail
+
+        return [
+        SELECT Id, Scan_Date__c, Status__c, Total_Flows_Scanned__c,
+               Total_Violations__c, Errors__c, Warnings__c, Affected_Flows__c
+        FROM Flow_Scan__c
+        WHERE Status__c = 'Complete'
+        ORDER BY Scan_Date__c DESC
+        LIMIT :lim
+    ];
+    }
 }

@@ -135,7 +135,8 @@ public with sharing class FlowMetadataService {
             'apexPluginCalls' => 'ApexPluginCall',
             'loops'           => 'Loop',
             'assignments'     => 'Assignment',
-            'decisions'       => 'Decision'
+            'decisions'       => 'Decision',
+            'screens'         => 'Screen'   
         };
 
         // First pass — collect fault connector targets
@@ -190,7 +191,11 @@ public with sharing class FlowMetadataService {
                     (Map<String, Object>) el.get('faultConnector');
                 wrapper.hasFaultConnector = (faultConn != null);
                 wrapper.rawValue          = JSON.serialize(el);
-
+                // 2. In the element-wrapper build loop, after wrapper.rawValue is set:
+                if (wrapper.elementType == 'Screen') {
+                    List<Object> fields = (List<Object>) el.get('fields');
+                    wrapper.fieldCount  = fields != null ? fields.size() : 0;
+                }                
                 if (el.containsKey('object')) {
                     wrapper.objectName = (String) el.get('object');
                 }
@@ -225,6 +230,7 @@ public with sharing class FlowMetadataService {
         return variables;
     }
 
+    // 3. In parseSubflows(), capture the called flow's API name:
     private static List<FlowWrapper.FlowElementWrapper> parseSubflows(
         Map<String, Object> metadata
     ) {
@@ -238,9 +244,10 @@ public with sharing class FlowMetadataService {
             Map<String, Object> el = (Map<String, Object>) item;
             FlowWrapper.FlowElementWrapper wrapper =
                 new FlowWrapper.FlowElementWrapper();
-            wrapper.name        = (String) el.get('name');
-            wrapper.elementType = 'Subflow';
-            wrapper.rawValue    = JSON.serialize(el);
+            wrapper.name              = (String) el.get('name');
+            wrapper.elementType       = 'Subflow';
+            wrapper.calledFlowApiName = (String) el.get('flowName'); // NEW
+            wrapper.rawValue          = JSON.serialize(el);
 
             Map<String, Object> faultConn =
                 (Map<String, Object>) el.get('faultConnector');

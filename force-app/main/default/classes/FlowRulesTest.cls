@@ -625,6 +625,59 @@ private class FlowRulesTest {
             'Should flag Create_Account, not Log_Error');
     }
 
+    @isTest
+    static void testTooManyScreenFieldsRule_Violation() {
+        FlowWrapper flow = makeFlow();
+        FlowWrapper.FlowElementWrapper el = new FlowWrapper.FlowElementWrapper();
+        el.name        = 'Big_Screen';
+        el.elementType = 'Screen';
+        el.fieldCount  = 12;
+        flow.elements.add(el);
+
+        TooManyScreenFieldsRule.FIELD_THRESHOLD = 10;
+        List<RuleViolation> violations = new TooManyScreenFieldsRule().evaluate(flow);
+        System.assertEquals(1, violations.size(), 'Should flag screen over threshold');
+        System.assertEquals('Warning', violations[0].severity);
+    }
+
+    @isTest
+    static void testTooManyScreenFieldsRule_NoViolation() {
+        FlowWrapper flow = makeFlow();
+        FlowWrapper.FlowElementWrapper el = new FlowWrapper.FlowElementWrapper();
+        el.name        = 'Small_Screen';
+        el.elementType = 'Screen';
+        el.fieldCount  = 3;
+        flow.elements.add(el);
+
+        System.assertEquals(0, new TooManyScreenFieldsRule().evaluate(flow).size());
+    }
+
+    @isTest
+    static void testRecursiveSubflowRule_Violation() {
+        FlowWrapper flow = makeFlow(); // flowApiName = 'Test_Flow'
+        FlowWrapper.FlowElementWrapper sf = new FlowWrapper.FlowElementWrapper();
+        sf.name              = 'Call_Self';
+        sf.elementType        = 'Subflow';
+        sf.calledFlowApiName = 'Test_Flow';
+        flow.subflows.add(sf);
+
+        List<RuleViolation> violations = new RecursiveSubflowRule().evaluate(flow);
+        System.assertEquals(1, violations.size(), 'Should flag self-recursive subflow');
+        System.assertEquals('Error', violations[0].severity);
+    }
+
+    @isTest
+    static void testRecursiveSubflowRule_NoViolation() {
+        FlowWrapper flow = makeFlow();
+        FlowWrapper.FlowElementWrapper sf = new FlowWrapper.FlowElementWrapper();
+        sf.name              = 'Call_Other';
+        sf.elementType        = 'Subflow';
+        sf.calledFlowApiName = 'Some_Other_Flow';
+        flow.subflows.add(sf);
+
+        System.assertEquals(0, new RecursiveSubflowRule().evaluate(flow).size());
+    }
+
     // ── Helper ───────────────────────────────────────────────────
     private static FlowWrapper makeFlow() {
         FlowWrapper flow    = new FlowWrapper();

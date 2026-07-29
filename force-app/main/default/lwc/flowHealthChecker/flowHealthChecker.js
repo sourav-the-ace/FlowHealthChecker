@@ -4,6 +4,7 @@ import initiateAsyncScan from '@salesforce/apex/FlowScannerService.initiateAsync
 import getScanStatus     from '@salesforce/apex/FlowScannerService.getScanStatus';
 import getScanResults    from '@salesforce/apex/FlowHealthCheckerController.getScanResults';
 import getRules          from '@salesforce/apex/FlowHealthCheckerController.getRules';
+import getScanHistory    from '@salesforce/apex/FlowHealthCheckerController.getScanHistory';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MESSAGES    = [
@@ -40,6 +41,8 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
     @track showRulesModal    = false;
     @track rulesList         = [];
     @track activeRuleCount   = 0;
+    @track showHistoryModal  = false;
+    @track historyList       = [];
 
     expandedFlows  = new Set();
     pollTimer      = null;
@@ -143,14 +146,7 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
         const total    = scan.svfhc__Total_Flows_Scanned__c || 0;
         const affected = new Set(results.map(r => r.svfhc__Flow_API_Name__c)).size;
 
-        const totalFlowsNum  = Number(total) || 1;
-        const cleanFlows     = totalFlowsNum - (affected || 0);
-        const cleanRatio     = cleanFlows / totalFlowsNum;
-        const errPenalty     = Math.min((errors   / totalFlowsNum) * 0.4, 0.4);
-        const warnPenalty    = Math.min((warnings / totalFlowsNum) * 0.1, 0.2);
-        const score          = Math.max(0, Math.round(
-            (cleanRatio - errPenalty - warnPenalty) * 100
-        )) + '%';
+        const score = this.computeHealthScore(total, errors, warnings) + '%';
 
         this.scanSummary = {
             scanId,
@@ -207,16 +203,16 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
             const flowDefinitionId =
                 violations[0]?.svfhc__Flow_Definition_Id__c || null;
 
-                groups.push({
-                    flowApiName,
-                    violations,
-                    errorCount      : errs  || null,
-                    warningCount    : warns || null,
-                    isExpanded      : expanded,
-                    chevron         : expanded ? '▼' : '▶',
-                    flowDefinitionId,
-                    violationsId    : 'violations-' + flowApiName.replace(/[^a-zA-Z0-9]/g, '-'),
-                    healthChipClass : errs  > 0
+            groups.push({
+                flowApiName,
+                violations,
+                errorCount      : errs  || null,
+                warningCount    : warns || null,
+                isExpanded      : expanded,
+                chevron         : expanded ? '▼' : '▶',
+                flowDefinitionId,
+                violationsId    : 'violations-' + flowApiName.replace(/[^a-zA-Z0-9]/g, '-'),
+                healthChipClass : errs  > 0
                     ? 'fhc-health-chip fhc-chip-critical'
                     : warns > 0
                     ? 'fhc-health-chip fhc-chip-warn'
@@ -328,6 +324,57 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
             'Too Many Elements', 'Hardcoded Id'
         ];
         return phase1.includes(label) ? 'Phase 1' : 'Phase 2';
+    }
+
+    // ── Scan History ─────────────────────────────────────────────
+
+    async openHistoryModal() {
+        try {
+            const history = await getScanHistory({ maxRecords: 20 });
+            this.historyList = history
+                .slice()
+                .reverse() // oldest → newest, so the chart reads left-to-right
+                .map(s => {
+                    const score = this.computeHealthScore(
+                        s.svfhc__Total_Flows_Scanned__c,
+                        s.svfhc__Errors__c,
+                        s.svfhc__Warnings__c
+                    );
+                    return {
+                        id: s.Id,
+                        date: new Date(s.svfhc__Scan_Date__c).toLocaleDateString(),
+                        totalFlows: s.svfhc__Total_Flows_Scanned__c,
+                        errors: s.svfhc__Errors__c || 0,
+                        warnings: s.svfhc__Warnings__c || 0,
+                        score,
+                        barStyle: `height:${score}%`,
+                        barClass: score >= 80
+                            ? 'fhc-bar fhc-bar-good'
+                            : score >= 50
+                            ? 'fhc-bar fhc-bar-warn'
+                            : 'fhc-bar fhc-bar-bad'
+                    };
+                });
+        } catch (err) {
+            this.errorMessage =
+                'Could not load scan history: ' + (err.body?.message || err.message);
+            return;
+        }
+        this.showHistoryModal = true;
+    }
+
+    closeHistoryModal() { this.showHistoryModal = false; }
+
+    // Shared by processScanData (live scan) and openHistoryModal (history)
+    // so both views always compute the score the same way.
+    computeHealthScore(total, errors, warnings) {
+        // Point-based: each Error costs more than each Warning, and the
+        // penalty scales with org size so a 1-flow org and a 200-flow org
+        // aren't judged on the same absolute scale.
+        const totalFlowsNum = Number(total) || 1;
+        const errPoints     = Math.min((Number(errors)   || 0) * (100 / totalFlowsNum) * 0.6, 100);
+        const warnPoints    = Math.min((Number(warnings) || 0) * (100 / totalFlowsNum) * 0.2, 100);
+        return Math.max(0, Math.round(100 - errPoints - warnPoints));
     }
 
     // ── Helpers ──────────────────────────────────────────────────

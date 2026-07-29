@@ -19,6 +19,10 @@
                         aria-haspopup="dialog">
                     📋 View Rules
                 </button>
+                <button class="fhc-btn-secondary" onclick={openHistoryModal}
+                        aria-label="View scan history and trend" aria-haspopup="dialog">
+                    📈 History
+                </button>
                 <button class="fhc-btn-primary"
                         onclick={handleScan}
                         disabled={isScanning}
@@ -119,16 +123,15 @@
                         <span class="fhc-tip-icon"
                               tabindex="0"
                               role="tooltip"
-                              aria-label="Score based on percentage of clean flows minus penalties for errors and warnings. 100% means all flows are fully clean.">?</span>
+                              aria-label="Score based on 100 points minus weighted penalties for errors and warnings. 100% means no violations found.">?</span>
                         <span class="fhc-tooltip fhc-tooltip-wide">
-                            Score = max(0, cleanRatio − errorPenalty − warningPenalty)
+                            Score = 100 − errorPoints − warningPoints
 
-                            cleanRatio = clean flows ÷ total flows
-                            errorPenalty = min(errors ÷ flows × 40%, 40%)
-                            warningPenalty = min(warnings ÷ flows × 10%, 20%)
+                            errorPoints = errors × (100 ÷ totalFlows) × 60%
+                            warningPoints = warnings × (100 ÷ totalFlows) × 20%
 
-                            Errors weigh 4× more than warnings.
-                            100% = all flows fully clean.
+                            Each Error costs 3× more than each Warning.
+                            100% = no violations found.
                         </span>
                     </span>
                 </div>
@@ -426,6 +429,44 @@
                                         <td class="fhc-desc-cell">
                                             {rule.description}
                                         </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <template if:true={showHistoryModal}>
+            <div class="fhc-modal-backdrop" onclick={closeHistoryModal} role="presentation">
+                <div class="fhc-modal" role="dialog" aria-modal="true"
+                    aria-labelledby="fhc-history-title" onclick={stopPropagation}>
+                    <div class="fhc-modal-header">
+                        <h2 class="fhc-modal-title" id="fhc-history-title">📈 Health Score Trend</h2>
+                        <button class="fhc-modal-close" onclick={closeHistoryModal}
+                                aria-label="Close history modal">✕</button>
+                    </div>
+                    <div class="fhc-modal-body">
+                        <div class="fhc-trend-chart" role="img"
+                            aria-label="Health score over the last {historyList.length} scans">
+                            <template for:each={historyList} for:item="row">
+                                <div key={row.id} class="fhc-trend-col">
+                                    <div class={row.barClass} style={row.barStyle}
+                                        title={row.score}></div>
+                                    <span class="fhc-trend-label">{row.date}</span>
+                                </div>
+                            </template>
+                        </div>
+                        <table class="fhc-rules-table" aria-label="Scan history detail">
+                            <thead>
+                                <tr><th>Date</th><th>Flows</th><th>Errors</th><th>Warnings</th><th>Score</th></tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={historyList} for:item="row">
+                                    <tr key={row.id}>
+                                        <td>{row.date}</td><td>{row.totalFlows}</td>
+                                        <td>{row.errors}</td><td>{row.warnings}</td>
+                                        <td>{row.score}%</td>
                                     </tr>
                                 </template>
                             </tbody>
