@@ -40,10 +40,10 @@ public with sharing class FlowHealthCheckerController {
     @AuraEnabled(cacheable=true)
     public static List<Flow_Rule__mdt> getRules() {
         return [
-            SELECT MasterLabel, svfhc__Severity__c, svfhc__Active__c,
-                   svfhc__Description__c, svfhc__Rule_Type__c
-            FROM svfhc__Flow_Rule__mdt
-            ORDER BY svfhc__Severity__c ASC, MasterLabel ASC
+            SELECT MasterLabel, Severity__c, Active__c,
+                   Description__c, Rule_Type__c
+            FROM Flow_Rule__mdt
+            ORDER BY Severity__c ASC, MasterLabel ASC
         ];
     }
     @AuraEnabled(cacheable=true)

@@ -16,6 +16,6 @@
     </values>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">Auto-launched or record-triggered flows must have a trigger configured on the Start element.</value>
+        <value xsi:type="xsd:string">Record-triggered flows must have a target SObject configured on the Start element.</value>
     </values>
 </CustomMetadata>

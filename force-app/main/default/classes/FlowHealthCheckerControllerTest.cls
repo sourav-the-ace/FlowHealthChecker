@@ -68,7 +68,7 @@ private class FlowHealthCheckerControllerTest {
         for (Flow_Rule__mdt r : rules) {
             System.assertNotEquals(null, r.MasterLabel, 
                 'Each rule should have a label');
-            System.assertNotEquals(null, r.svfhc__Severity__c, 
+            System.assertNotEquals(null, r.Severity__c, 
                 'Each rule should have a severity');
         }
     }
@@ -165,7 +165,7 @@ private class FlowHealthCheckerControllerTest {
         for (Flow_Rule__mdt r : rules) {
             System.assertNotEquals(null, r.MasterLabel,
                 'Each rule should have a MasterLabel');
-            System.assertNotEquals(null, r.svfhc__Severity__c,
+            System.assertNotEquals(null, r.Severity__c,
                 'Each rule should have a Severity');
         }
     }
@@ -180,10 +180,10 @@ private class FlowHealthCheckerControllerTest {
         // Verify rules come back ordered — Errors before Warnings
         Boolean foundWarning = false;
         for (Flow_Rule__mdt r : rules) {
-            if (r.svfhc__Severity__c == 'Warning') {
+            if (r.Severity__c == 'Warning') {
                 foundWarning = true;
             }
-            if (foundWarning && r.svfhc__Severity__c == 'Error') {
+            if (foundWarning && r.Severity__c == 'Error') {
                 System.assert(false,
                     'Errors should come before Warnings in ordering');
             }
@@ -277,9 +277,9 @@ private class FlowHealthCheckerControllerTest {
         for (Flow_Rule__mdt r : rules) {
             System.assertNotEquals(null, r.MasterLabel,
                 'Rule label should not be null');
-            System.assertNotEquals(null, r.svfhc__Severity__c,
+            System.assertNotEquals(null, r.Severity__c,
                 'Rule severity should not be null');
-            System.assertNotEquals(null, r.svfhc__Rule_Type__c,
+            System.assertNotEquals(null, r.Rule_Type__c,
                 'Rule type should not be null');
         }
         System.assert(rules.size() >= 5,

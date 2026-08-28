@@ -46,8 +46,10 @@ public with sharing class FlowMetadataService {
             if (!isValidSalesforceId(definitionId)) continue;
 
             // Sanitize string fields from API response
-            String developerName = String.valueOf(flowRec.get('DeveloperName'));
-            String masterLabel   = String.valueOf(flowRec.get('MasterLabel'));
+            String developerName = flowRec.get('DeveloperName') != null
+                ? String.valueOf(flowRec.get('DeveloperName')) : '';
+            String masterLabel   = flowRec.get('MasterLabel') != null
+                ? String.valueOf(flowRec.get('MasterLabel')) : null;
             String description   = flowRec.get('Description') != null
                 ? String.valueOf(flowRec.get('Description')) : null;
 
@@ -84,8 +86,14 @@ public with sharing class FlowMetadataService {
 
         FlowWrapper flow    = new FlowWrapper();
         flow.flowApiName    = apiName;
-        flow.flowLabel      = label;
-        flow.description    = description;
+        String metaLabel    = (String) metadata.get('label');
+        String metaDesc     = (String) metadata.get('description');
+        flow.flowLabel      = (String.isNotBlank(label) && label != 'null')
+            ? label
+            : ((String.isNotBlank(metaLabel) && metaLabel != 'null') ? metaLabel : apiName);
+        flow.description    = (String.isNotBlank(description) && description != 'null')
+            ? description
+            : metaDesc;
         flow.processType      = (String) metadata.get('processType');
         flow.flowDefinitionId = definitionId;
         flow.elements         = parseElements(metadata);
@@ -127,16 +135,21 @@ public with sharing class FlowMetadataService {
         // Build fault path set — collect all elements reachable via fault connectors
         Set<String> faultPathElements = new Set<String>();
         Map<String, String> elementTypeKeys = new Map<String, String>{
-            'recordCreates'   => 'RecordCreate',
-            'recordUpdates'   => 'RecordUpdate',
-            'recordDeletes'   => 'RecordDelete',
-            'recordLookups'   => 'RecordLookup',
-            'actionCalls'     => 'ActionCall',
-            'apexPluginCalls' => 'ApexPluginCall',
-            'loops'           => 'Loop',
-            'assignments'     => 'Assignment',
-            'decisions'       => 'Decision',
-            'screens'         => 'Screen'   
+            'recordCreates'        => 'RecordCreate',
+            'recordUpdates'        => 'RecordUpdate',
+            'recordDeletes'        => 'RecordDelete',
+            'recordLookups'        => 'RecordLookup',
+            'actionCalls'          => 'ActionCall',
+            'apexPluginCalls'      => 'ApexPluginCall',
+            'loops'                => 'Loop',
+            'assignments'          => 'Assignment',
+            'decisions'            => 'Decision',
+            'screens'              => 'Screen',
+            'collectionProcessors' => 'CollectionProcessor',
+            'customErrors'         => 'CustomError',
+            'recordRollbacks'      => 'RecordRollback',
+            'transforms'           => 'Transform',
+            'waits'                => 'Wait'
         };
 
         // First pass — collect fault connector targets
@@ -191,7 +204,6 @@ public with sharing class FlowMetadataService {
                     (Map<String, Object>) el.get('faultConnector');
                 wrapper.hasFaultConnector = (faultConn != null);
                 wrapper.rawValue          = JSON.serialize(el);
-                // 2. In the element-wrapper build loop, after wrapper.rawValue is set:
                 if (wrapper.elementType == 'Screen') {
                     List<Object> fields = (List<Object>) el.get('fields');
                     wrapper.fieldCount  = fields != null ? fields.size() : 0;
@@ -261,25 +273,35 @@ public with sharing class FlowMetadataService {
         Map<String, Object> metadata,
         List<FlowWrapper.FlowElementWrapper> elements
     ) {
-        // Walk every connector in every element type and collect
-        // all targetReferences — these are elements that are reachable
-        Set<String> connected = new Set<String>();
+        Set<String> roots = new Set<String>();
 
-        // Start element is always connected
+        // 1. Top-level startElementReference (Screen flows, standard flows)
+        String startElementRef = (String) metadata.get('startElementReference');
+        if (String.isNotBlank(startElementRef)) {
+            roots.add(startElementRef);
+        }
+
+        // 2. Start element connector & scheduled paths
         Map<String, Object> start = (Map<String, Object>) metadata.get('start');
         if (start != null) {
-            Map<String, Object> startConn =
-                (Map<String, Object>) start.get('connector');
-            if (startConn != null) {
-                connected.add((String) startConn.get('targetReference'));
+            collectTarget(start, 'connector', roots);
+
+            List<Object> scheduledPaths = (List<Object>) start.get('scheduledPaths');
+            if (scheduledPaths != null) {
+                for (Object sp : scheduledPaths) {
+                    collectTarget((Map<String, Object>) sp, 'connector', roots);
+                }
             }
         }
 
-        // All element types that can have connectors
+        // 3. Build adjacency list of element connectors
+        Map<String, Set<String>> adjacency = new Map<String, Set<String>>();
+
         List<String> allKeys = new List<String>{
             'recordCreates', 'recordUpdates', 'recordDeletes', 'recordLookups',
             'actionCalls', 'apexPluginCalls', 'loops', 'assignments',
-            'decisions', 'subflows', 'screens', 'customErrors'
+            'decisions', 'subflows', 'screens', 'customErrors',
+            'collectionProcessors', 'recordRollbacks', 'transforms', 'waits'
         };
 
         for (String key : allKeys) {
@@ -289,27 +311,69 @@ public with sharing class FlowMetadataService {
             for (Object item : items) {
                 Map<String, Object> el = (Map<String, Object>) item;
                 String elName = (String) el.get('name');
+                if (String.isBlank(elName)) continue;
+
+                if (!adjacency.containsKey(elName)) {
+                    adjacency.put(elName, new Set<String>());
+                }
+                Set<String> targets = adjacency.get(elName);
 
                 // Regular connector
-                collectTarget(el, 'connector', connected);
+                collectTargetIntoSet(el, 'connector', targets);
 
                 // Fault connector
-                collectTarget(el, 'faultConnector', connected);
+                collectTargetIntoSet(el, 'faultConnector', targets);
+
+                // Default connector (Decisions, Waits)
+                collectTargetIntoSet(el, 'defaultConnector', targets);
 
                 // Decision rules (outcomes)
                 List<Object> rules = (List<Object>) el.get('rules');
                 if (rules != null) {
                     for (Object rule : rules) {
-                        collectTarget((Map<String, Object>) rule, 'connector', connected);
+                        collectTargetIntoSet((Map<String, Object>) rule, 'connector', targets);
+                    }
+                }
+
+                // Wait events
+                List<Object> waitEvents = (List<Object>) el.get('waitEvents');
+                if (waitEvents != null) {
+                    for (Object we : waitEvents) {
+                        collectTargetIntoSet((Map<String, Object>) we, 'connector', targets);
                     }
                 }
 
                 // Loop connectors
-                collectTarget(el, 'nextValueConnector', connected);
-                collectTarget(el, 'noMoreValuesConnector', connected);
+                collectTargetIntoSet(el, 'nextValueConnector', targets);
+                collectTargetIntoSet(el, 'noMoreValuesConnector', targets);
             }
         }
-        return connected;
+
+        // 4. Perform BFS traversal from all roots to find all reachable elements
+        Set<String> reachable = new Set<String>();
+        List<String> queue = new List<String>();
+
+        for (String root : roots) {
+            if (String.isNotBlank(root) && !reachable.contains(root)) {
+                reachable.add(root);
+                queue.add(root);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            String current = queue.remove(0);
+            Set<String> neighbors = adjacency.get(current);
+            if (neighbors != null) {
+                for (String neighbor : neighbors) {
+                    if (String.isNotBlank(neighbor) && !reachable.contains(neighbor)) {
+                        reachable.add(neighbor);
+                        queue.add(neighbor);
+                    }
+                }
+            }
+        }
+
+        return reachable;
     }
 
     private static void collectTarget(
@@ -319,6 +383,16 @@ public with sharing class FlowMetadataService {
         if (conn != null) {
             String target = (String) conn.get('targetReference');
             if (String.isNotBlank(target)) connected.add(target);
+        }
+    }
+
+    private static void collectTargetIntoSet(
+        Map<String, Object> el, String connectorKey, Set<String> targets
+    ) {
+        Map<String, Object> conn = (Map<String, Object>) el.get(connectorKey);
+        if (conn != null) {
+            String target = (String) conn.get('targetReference');
+            if (String.isNotBlank(target)) targets.add(target);
         }
     }
 
@@ -396,8 +470,10 @@ public with sharing class FlowMetadataService {
 
         String activeVersionId = (String) flowRec.get('ActiveVersionId');
         String definitionId    = (String) flowRec.get('Id');
-        String developerName   = String.valueOf(flowRec.get('DeveloperName'));
-        String masterLabel     = String.valueOf(flowRec.get('MasterLabel'));
+        String developerName   = flowRec.get('DeveloperName') != null
+            ? String.valueOf(flowRec.get('DeveloperName')) : '';
+        String masterLabel     = flowRec.get('MasterLabel') != null
+            ? String.valueOf(flowRec.get('MasterLabel')) : null;
         String description     = flowRec.get('Description') != null
             ? String.valueOf(flowRec.get('Description')) : null;
 

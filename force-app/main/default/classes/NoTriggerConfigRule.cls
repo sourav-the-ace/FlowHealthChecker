@@ -1,35 +1,34 @@
 public class NoTriggerConfigRule implements IFlowRule {
 
-    // These process types should always have a trigger configured
-    private static final Set<String> TRIGGER_REQUIRED_TYPES = new Set<String>{
-        'AutoLaunchedFlow', 'RecordTriggeredFlow', 'ScheduledFlow'
+    private static final Set<String> RECORD_TRIGGER_TYPES = new Set<String>{
+        'RecordBeforeSave', 'RecordAfterSave', 'RecordBeforeDelete'
     };
 
     public List<RuleViolation> evaluate(FlowWrapper flow) {
         List<RuleViolation> violations = new List<RuleViolation>();
 
-        if (!TRIGGER_REQUIRED_TYPES.contains(flow.processType)) {
-            return violations; // Screen flows etc. don't need triggers
+        String flowDisplayName = String.isNotBlank(flow.flowLabel) && flow.flowLabel != 'null'
+            ? flow.flowLabel
+            : flow.flowApiName;
+
+        // Record-Triggered Flows must have a target SObject configured
+        Boolean isRecordTriggered = flow.processType == 'RecordTriggeredFlow'
+            || (flow.startConfig != null && RECORD_TRIGGER_TYPES.contains(flow.startConfig.triggerType));
+
+        if (isRecordTriggered) {
+            if (flow.startConfig == null || String.isBlank(flow.startConfig.objectApiName)) {
+                RuleViolation v = new RuleViolation(
+                    'No Trigger Configuration',
+                    'Warning',
+                    flow.flowApiName,
+                    'Flow "' + flowDisplayName 
+                        + '" is a Record-Triggered Flow but has no target SObject configured on the Start element.'
+                );
+                v.flowApiName = flow.flowApiName;
+                violations.add(v);
+            }
         }
 
-        Boolean missingConfig =
-            flow.startConfig == null
-            || (String.isBlank(flow.startConfig.triggerType)
-                && String.isBlank(flow.startConfig.objectApiName));
-
-        if (missingConfig) {
-            RuleViolation v = new RuleViolation(
-                'No Trigger Configuration',
-                'Warning',
-                flow.flowApiName,
-                'Flow "' + (String.isNotBlank(flow.flowLabel) ? flow.flowLabel : flow.flowApiName) 
-                    + '" is type ' + flow.processType                    
-                    + ' but has no trigger or object configured on the Start element. '
-                    + 'It cannot be automatically invoked.'
-            );
-            v.flowApiName = flow.flowApiName;
-            violations.add(v);
-        }
         return violations;
     }
 }

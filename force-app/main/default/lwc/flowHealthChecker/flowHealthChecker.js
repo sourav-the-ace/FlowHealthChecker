@@ -141,10 +141,11 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
         const scan    = data.scan;
         const results = data.results;
 
-        const errors   = results.filter(r => r.svfhc__Severity__c === 'Error').length;
-        const warnings = results.filter(r => r.svfhc__Severity__c === 'Warning').length;
-        const total    = scan.svfhc__Total_Flows_Scanned__c || 0;
-        const affected = new Set(results.map(r => r.svfhc__Flow_API_Name__c)).size;
+        const errors   = results.filter(r => (r.svfhc__Severity__c || r.Severity__c) === 'Error').length;
+        const warnings = results.filter(r => (r.svfhc__Severity__c || r.Severity__c) === 'Warning').length;
+        const total    = scan.svfhc__Total_Flows_Scanned__c || scan.Total_Flows_Scanned__c || 0;
+        const affected = new Set(results.map(r => r.svfhc__Flow_API_Name__c || r.Flow_API_Name__c)).size;
+        const scanDateVal = scan.svfhc__Scan_Date__c || scan.Scan_Date__c;
 
         const score = this.computeHealthScore(total, errors, warnings) + '%';
 
@@ -155,17 +156,31 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
             warnings,
             score,
             affectedFlows: affected,
-            scanDate     : new Date(scan.svfhc__Scan_Date__c).toLocaleString()
+            scanDate     : scanDateVal ? new Date(scanDateVal).toLocaleString() : ''
         };
 
-        this.allResults = results.map(r => ({
-            ...r,
-            rowClass    : this.rowClass(r.svfhc__Severity__c),
-            badgeClass  : this.badgeClass(r.svfhc__Severity__c),
-            severityIcon: this.severityIcon(r.svfhc__Severity__c)
-        }));
+        this.allResults = results.map(r => {
+            const severity    = r.svfhc__Severity__c || r.Severity__c;
+            const ruleName    = r.svfhc__Rule_Name__c || r.Rule_Name__c;
+            const elementName = r.svfhc__Element_Name__c || r.Element_Name__c;
+            const description = r.svfhc__Description__c || r.Description__c;
+            const flowApiName = r.svfhc__Flow_API_Name__c || r.Flow_API_Name__c;
+            const defId       = r.svfhc__Flow_Definition_Id__c || r.Flow_Definition_Id__c;
+            return {
+                ...r,
+                svfhc__Severity__c          : severity,
+                svfhc__Rule_Name__c         : ruleName,
+                svfhc__Element_Name__c       : elementName,
+                svfhc__Description__c       : description,
+                svfhc__Flow_API_Name__c     : flowApiName,
+                svfhc__Flow_Definition_Id__c: defId,
+                rowClass                    : this.rowClass(severity),
+                badgeClass                  : this.badgeClass(severity),
+                severityIcon                : this.severityIcon(severity)
+            };
+        });
 
-        new Set(results.map(r => r.svfhc__Flow_API_Name__c))
+        new Set(results.map(r => r.svfhc__Flow_API_Name__c || r.Flow_API_Name__c))
             .forEach(f => this.expandedFlows.add(f));
 
         this.hasScanResult = true;
@@ -297,15 +312,19 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
         if (this.rulesList.length === 0) {
             try {
                 const rules = await getRules();
-                this.rulesList = rules.map(r => ({
-                    label       : r.MasterLabel,
-                    severity    : r.svfhc__Severity__c,
-                    description : r.svfhc__Description__c,
-                    phase       : this.getRulePhase(r.MasterLabel),
-                    badgeClass  : this.badgeClass(r.svfhc__Severity__c),
-                    severityIcon: this.severityIcon(r.svfhc__Severity__c)
-                }));
-                this.activeRuleCount = rules.filter(r => r.svfhc__Active__c).length;
+                this.rulesList = rules.map(r => {
+                    const severity = r.svfhc__Severity__c || r.Severity__c;
+                    const description = r.svfhc__Description__c || r.Description__c;
+                    return {
+                        label       : r.MasterLabel,
+                        severity    : severity,
+                        description : description,
+                        phase       : this.getRulePhase(r.MasterLabel),
+                        badgeClass  : this.badgeClass(severity),
+                        severityIcon: this.severityIcon(severity)
+                    };
+                });
+                this.activeRuleCount = rules.filter(r => (r.svfhc__Active__c !== undefined ? r.svfhc__Active__c : r.Active__c)).length;
             } catch (err) {
                 this.errorMessage =
                     'Could not load rules: ' + (err.body?.message || err.message);
@@ -335,17 +354,21 @@ export default class FlowHealthChecker extends NavigationMixin(LightningElement)
                 .slice()
                 .reverse() // oldest → newest, so the chart reads left-to-right
                 .map(s => {
+                    const totalFlows = s.svfhc__Total_Flows_Scanned__c || s.Total_Flows_Scanned__c || 0;
+                    const errors = s.svfhc__Errors__c || s.Errors__c || 0;
+                    const warnings = s.svfhc__Warnings__c || s.Warnings__c || 0;
+                    const scanDate = s.svfhc__Scan_Date__c || s.Scan_Date__c;
                     const score = this.computeHealthScore(
-                        s.svfhc__Total_Flows_Scanned__c,
-                        s.svfhc__Errors__c,
-                        s.svfhc__Warnings__c
+                        totalFlows,
+                        errors,
+                        warnings
                     );
                     return {
                         id: s.Id,
-                        date: new Date(s.svfhc__Scan_Date__c).toLocaleDateString(),
-                        totalFlows: s.svfhc__Total_Flows_Scanned__c,
-                        errors: s.svfhc__Errors__c || 0,
-                        warnings: s.svfhc__Warnings__c || 0,
+                        date: scanDate ? new Date(scanDate).toLocaleDateString() : '',
+                        totalFlows: totalFlows,
+                        errors: errors,
+                        warnings: warnings,
                         score,
                         barStyle: `height:${score}%`,
                         barClass: score >= 80

@@ -213,7 +213,7 @@ private class FlowRulesTest {
     // ── SubflowFaultPathRule ─────────────────────────────────────
 
     @isTest
-    static void testSubflowFaultPathRule_Violation() {
+    static void testSubflowFaultPathRule_Deactivated_ReturnsNoViolations() {
         FlowWrapper flow = makeFlow();
         FlowWrapper.FlowElementWrapper sf = new FlowWrapper.FlowElementWrapper();
         sf.name              = 'Create_Contacts_Subflow';
@@ -223,22 +223,8 @@ private class FlowRulesTest {
 
         SubflowFaultPathRule rule = new SubflowFaultPathRule();
         List<RuleViolation> violations = rule.evaluate(flow);
-        System.assertEquals(1, violations.size(), 'Should flag subflow without fault path');
-        System.assertEquals('Error', violations[0].severity);
-    }
-
-    @isTest
-    static void testSubflowFaultPathRule_NoViolation() {
-        FlowWrapper flow = makeFlow();
-        FlowWrapper.FlowElementWrapper sf = new FlowWrapper.FlowElementWrapper();
-        sf.name              = 'Create_Contacts_Subflow';
-        sf.elementType       = 'Subflow';
-        sf.hasFaultConnector = true;
-        flow.subflows.add(sf);
-
-        SubflowFaultPathRule rule = new SubflowFaultPathRule();
-        System.assertEquals(0, rule.evaluate(flow).size(),
-            'Should not flag subflow with fault path');
+        System.assertEquals(0, violations.size(),
+            'Should return no violations as rule is deactivated for subflow components');
     }
 
     @isTest
@@ -254,31 +240,31 @@ private class FlowRulesTest {
     // ── NoTriggerConfigRule ──────────────────────────────────────
 
     @isTest
-    static void testNoTriggerConfigRule_Violation() {
+    static void testNoTriggerConfigRule_RecordTriggerMissingObject_Violation() {
         FlowWrapper flow    = makeFlow();
-        flow.processType    = 'AutoLaunchedFlow';
+        flow.processType    = 'RecordTriggeredFlow';
         flow.startConfig    = null; // no start config
 
         NoTriggerConfigRule rule = new NoTriggerConfigRule();
         List<RuleViolation> violations = rule.evaluate(flow);
         System.assertEquals(1, violations.size(),
-            'Should flag AutoLaunchedFlow with no trigger');
+            'Should flag RecordTriggeredFlow with no object');
         System.assertEquals('Warning', violations[0].severity);
     }
 
     @isTest
-    static void testNoTriggerConfigRule_MissingTriggerType() {
+    static void testNoTriggerConfigRule_RecordBeforeSaveMissingObject() {
         FlowWrapper flow    = makeFlow();
         flow.processType    = 'AutoLaunchedFlow';
         FlowWrapper.FlowStartWrapper start = new FlowWrapper.FlowStartWrapper();
-        start.triggerType   = null;
-        start.objectApiName = null;
+        start.triggerType   = 'RecordBeforeSave';
+        start.objectApiName = null; // missing object
         flow.startConfig    = start;
 
         NoTriggerConfigRule rule = new NoTriggerConfigRule();
         List<RuleViolation> violations = rule.evaluate(flow);
         System.assertEquals(1, violations.size(),
-            'Should flag when triggerType and objectApiName are both blank');
+            'Should flag when record trigger type exists but object is blank');
     }
 
     @isTest
@@ -292,7 +278,18 @@ private class FlowRulesTest {
 
         NoTriggerConfigRule rule = new NoTriggerConfigRule();
         System.assertEquals(0, rule.evaluate(flow).size(),
-            'Should not flag when trigger is configured');
+            'Should not flag when trigger and object are configured');
+    }
+
+    @isTest
+    static void testNoTriggerConfigRule_AutoLaunchedSubflow_NoViolation() {
+        FlowWrapper flow    = makeFlow();
+        flow.processType    = 'AutoLaunchedFlow';
+        flow.startConfig    = null; // standard subflow has no startConfig / trigger
+
+        NoTriggerConfigRule rule = new NoTriggerConfigRule();
+        System.assertEquals(0, rule.evaluate(flow).size(),
+            'Should not flag standard autolaunched subflows');
     }
 
     @isTest
@@ -676,6 +673,40 @@ private class FlowRulesTest {
         flow.subflows.add(sf);
 
         System.assertEquals(0, new RecursiveSubflowRule().evaluate(flow).size());
+    }
+
+    @isTest
+    static void testTooManyElementsRule_NullLabel_UsesApiName() {
+        FlowWrapper flow = makeFlow();
+        flow.flowLabel = null;
+        TooManyElementsRule.ELEMENT_THRESHOLD = 2;
+
+        for (Integer i = 0; i < 3; i++) {
+            FlowWrapper.FlowElementWrapper el = new FlowWrapper.FlowElementWrapper();
+            el.name        = 'El_' + i;
+            el.elementType = 'Assignment';
+            flow.elements.add(el);
+        }
+
+        List<RuleViolation> violations = new TooManyElementsRule().evaluate(flow);
+        System.assertEquals(1, violations.size());
+        System.assert(!violations[0].description.contains('"null"'),
+            'Should not contain string "null" in description. Actual: ' + violations[0].description);
+        System.assert(violations[0].description.contains('Test_Flow'),
+            'Should fall back to flowApiName');
+    }
+
+    @isTest
+    static void testMissingDescriptionRule_NullLabel_UsesApiName() {
+        FlowWrapper flow = makeFlow();
+        flow.flowLabel = 'null';
+        flow.description = null;
+
+        List<RuleViolation> violations = new MissingDescriptionRule().evaluate(flow);
+        System.assertEquals(1, violations.size());
+        System.assert(!violations[0].description.contains('"null"'),
+            'Should not contain string "null" in description');
+        System.assert(violations[0].description.contains('Test_Flow'));
     }
 
     // ── Helper ───────────────────────────────────────────────────

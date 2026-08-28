@@ -12,10 +12,10 @@
     </values>
     <values>
         <field>Active__c</field>
-        <value xsi:type="xsd:boolean">true</value>
+        <value xsi:type="xsd:boolean">false</value>
     </values>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">Subflow elements must have fault connectors to handle errors from called flows.</value>
+        <value xsi:type="xsd:string">Deactivated: Salesforce Flow Builder does not support fault connectors on Subflow elements.</value>
     </values>
 </CustomMetadata>

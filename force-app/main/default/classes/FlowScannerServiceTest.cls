@@ -293,4 +293,62 @@ private class FlowScannerServiceTest {
         }
         Test.stopTest();
     }
+
+    private class ComplexFlowGraphMock implements HttpCalloutMock {
+        public HTTPResponse respond(HTTPRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setHeader('Content-Type', 'application/json');
+            res.setStatusCode(200);
+            res.setBody(
+                '{"Id":"3010H000000fake003","Metadata":{'
+                + '"processType":"Flow",'
+                + '"label":"Case Screen Flow - Create Opportunity",'
+                + '"description":"Creates opportunity from case",'
+                + '"startElementReference":"Check_Case_Has_Account",'
+                + '"start":{"connector":{"targetReference":"Check_Case_Has_Account"},"scheduledPaths":[{"connector":{"targetReference":"Scheduled_Action"}}]},'
+                + '"decisions":[{"name":"Check_Case_Has_Account","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"rules":[{"name":"Has_Account","connector":{"targetReference":"Create_Opportunity_Screen"}}]}],'
+                + '"screens":[{"name":"Create_Opportunity_Screen","fields":[{"name":"OppName"}]}],'
+                + '"subflows":[{"name":"Call_Subflow","flowName":"Subflow_Api_Name","faultConnector":{"targetReference":"Subflow_Fault"}}],'
+                + '"customErrors":[{"name":"Subflow_Fault"}],'
+                + '"transforms":[{"name":"Transform_Data"}],'
+                + '"recordRollbacks":[{"name":"Rollback_DML"}],'
+                + '"collectionProcessors":[{"name":"Filter_List"}],'
+                + '"waits":[{"name":"Wait_Element","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"waitEvents":[{"connector":{"targetReference":"Transform_Data"}}]}],'
+                + '"variables":[{"name":"varAccount","dataType":"String","isInput":true,"isOutput":false}]'
+                + '}}'
+            );
+            return res;
+        }
+    }
+
+    @isTest
+    static void testFetchSingleFlow_ComplexFlowGraph() {
+        Test.setMock(HttpCalloutMock.class, new ComplexFlowGraphMock());
+
+        Map<String, Object> mockFlowRec = new Map<String, Object>{
+            'Id'              => '3010H000000fake001',
+            'DeveloperName'   => 'Case_Screen_Flow_Create_Opportunity',
+            'MasterLabel'     => null, // test fallback to metadata label
+            'Description'     => null, // test fallback to metadata description
+            'ActiveVersionId' => '3010H000000fake003'
+        };
+
+        Test.startTest();
+        FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
+            mockFlowRec, 'fakeSessionId000001'
+        );
+        Test.stopTest();
+
+        System.assertNotEquals(null, flow);
+        System.assertEquals('Case Screen Flow - Create Opportunity', flow.flowLabel,
+            'Should fall back to metadata label when flowRec MasterLabel is null');
+        System.assertEquals('Creates opportunity from case', flow.description,
+            'Should fall back to metadata description');
+        System.assert(flow.connectedElements.contains('Check_Case_Has_Account'),
+            'Decision element should be reached via startElementReference / start connector');
+        System.assert(flow.connectedElements.contains('Create_Opportunity_Screen'),
+            'Screen element should be reached via decision defaultConnector & rules');
+        System.assert(flow.connectedElements.contains('Scheduled_Action'),
+            'Scheduled action should be reached via scheduledPaths');
+    }
 }

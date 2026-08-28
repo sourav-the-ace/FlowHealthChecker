@@ -6,13 +6,17 @@ public class TooManyElementsRule implements IFlowRule {
     public List<RuleViolation> evaluate(FlowWrapper flow) {
         List<RuleViolation> violations = new List<RuleViolation>();
 
-        Integer count = flow.elements.size();
+        Integer count = flow.elements != null ? flow.elements.size() : 0;
         if (count > ELEMENT_THRESHOLD) {
+            String flowDisplayName = String.isNotBlank(flow.flowLabel) && flow.flowLabel != 'null'
+                ? flow.flowLabel
+                : flow.flowApiName;
+
             RuleViolation v = new RuleViolation(
                 'Too Many Elements',
                 'Warning',
                 flow.flowApiName,
-                'Flow "' + flow.flowLabel + '" has ' + count 
+                'Flow "' + flowDisplayName + '" has ' + count 
                     + ' elements (threshold: ' + ELEMENT_THRESHOLD 
                     + '). Consider splitting into subflows.'
             );
