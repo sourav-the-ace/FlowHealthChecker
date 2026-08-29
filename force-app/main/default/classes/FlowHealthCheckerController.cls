@@ -52,6 +52,7 @@ public with sharing class FlowHealthCheckerController {
     return [
       SELECT MasterLabel, Severity__c, Active__c, Description__c, Rule_Type__c
       FROM Flow_Rule__mdt
+      WHERE Active__c = TRUE
       ORDER BY Severity__c ASC, MasterLabel ASC
     ];
   }

@@ -4,8 +4,8 @@
       "path": "force-app",
       "default": true,
       "package": "Flow Health Checker",
-      "versionName": "ver 0.10",
-      "versionNumber": "0.10.0.NEXT",
+      "versionName": "ver 0.11",
+      "versionNumber": "0.11.0.NEXT",
       "ancestorVersion": "HIGHEST",
       "definitionFile": "config/project-scratch-def.json",
       "postInstallScript": "FHCPostInstallScript",
@@ -29,6 +29,7 @@
     "Flow Health Checker@0.7.0-1": "04tdL000000o5KfQAI",
     "Flow Health Checker@0.8.0-1": "04tdL000000o5MHQAY",
     "Flow Health Checker@0.9.0-1": "04tdL000000o6gXQAQ",
-    "Flow Health Checker@0.10.0-1": "04tdL000000o6mzQAA"
+    "Flow Health Checker@0.10.0-1": "04tdL000000o6mzQAA",
+    "Flow Health Checker@0.11.0-1": "04tdL000000o6obQAA"
   }
 }

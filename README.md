@@ -119,12 +119,12 @@ force-app/main/default/
 ### 1. Install Managed Package
 
 Install the package into your Salesforce org via web browser:
-🔗 **[Direct Installation Link (v0.10.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6mzQAA)**
+🔗 **[Direct Installation Link (v0.11.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6obQAA)**
 
 Or install via Salesforce CLI:
 
 ```bash
-sf package install --package "04tdL000000o6mzQAA" --wait 10 --target-org my-target-org
+sf package install --package "04tdL000000o6obQAA" --wait 10 --target-org my-target-org
 ```
 
 ### 2. Assign Permissions

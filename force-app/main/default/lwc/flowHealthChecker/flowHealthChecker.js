@@ -351,7 +351,12 @@ export default class FlowHealthChecker extends NavigationMixin(
     if (this.rulesList.length === 0) {
       try {
         const rules = await getRules();
-        this.rulesList = rules.map((r) => {
+        const activeRules = rules.filter((r) => {
+          const isActive =
+            r.svfhc__Active__c !== undefined ? r.svfhc__Active__c : r.Active__c;
+          return isActive !== false;
+        });
+        this.rulesList = activeRules.map((r) => {
           const severity = r.svfhc__Severity__c || r.Severity__c;
           const description = r.svfhc__Description__c || r.Description__c;
           return {
@@ -363,11 +368,7 @@ export default class FlowHealthChecker extends NavigationMixin(
             severityIcon: this.severityIcon(severity)
           };
         });
-        this.activeRuleCount = rules.filter((r) => {
-          return r.svfhc__Active__c !== undefined
-            ? r.svfhc__Active__c
-            : r.Active__c;
-        }).length;
+        this.activeRuleCount = this.rulesList.length;
       } catch (err) {
         this.errorMessage =
           "Could not load rules: " + (err.body?.message || err.message);
