@@ -1,10 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <classAccesses>
         <apexClass>FlowHealthCheckerController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-    <description>Read-only access to Flow Health Checker — can view scan results but cannot run scans.</description>
+    <description
+  >Read-only access to Flow Health Checker — can view scan results but cannot run scans.</description>
     <fieldPermissions>
         <editable>false</editable>
         <field>Flow_Scan_Result__c.Description__c</field>
@@ -52,6 +53,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
+        <field>Flow_Scan__c.Health_Score__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
         <field>Flow_Scan__c.Warnings__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -75,6 +81,10 @@
         <object>Flow_Scan__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
+    <pageAccesses>
+        <apexPage>SessionHelper</apexPage>
+        <enabled>true</enabled>
+    </pageAccesses>
     <tabSettings>
         <tab>Flow_Health_Checker</tab>
         <visibility>Visible</visibility>

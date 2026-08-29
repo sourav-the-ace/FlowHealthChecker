@@ -1,354 +1,512 @@
 @isTest
 private class FlowScannerServiceTest {
+  @isTest
+  static void testInitiateAsyncScan() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
 
-    @isTest
-    static void testInitiateAsyncScan() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-    
-        Test.startTest();
-        Id scanId = FlowScannerService.initiateAsyncScan();
-        Test.stopTest();
-    
-        System.assertNotEquals(null, scanId,
-            'Scan ID should be returned');
-    
-        // Query without WITH SECURITY_ENFORCED in test context
-        // since test users may not have FLS configured
-        List<Flow_Scan__c> scans = [
-            SELECT Id, Status__c, Total_Flows_Scanned__c, Total_Violations__c
-            FROM Flow_Scan__c
-            WHERE Id = :scanId
-            LIMIT 1
-        ];
-    
-        System.assertEquals(1, scans.size(),
-            'Scan record should exist');
-        // After stopTest, the first queueable (FlowScanQueueable) runs
-        // synchronously and processes the first batch inline
-        // so scan should be Complete with mock data (1 flow)
-        System.assert(
-            scans[0].Status__c == 'Complete' || scans[0].Status__c == 'Failed',
-            'Scan should be Complete or Failed. Actual: ' + scans[0].Status__c
-        );
+    Test.startTest();
+    Id scanId = FlowScannerService.initiateAsyncScan();
+    Test.stopTest();
+
+    System.assertNotEquals(null, scanId, 'Scan ID should be returned');
+
+    // Query without WITH SECURITY_ENFORCED in test context
+    // since test users may not have FLS configured
+    List<Flow_Scan__c> scans = [
+      SELECT Id, Status__c, Total_Flows_Scanned__c, Total_Violations__c
+      FROM Flow_Scan__c
+      WHERE Id = :scanId
+      LIMIT 1
+    ];
+
+    System.assertEquals(1, scans.size(), 'Scan record should exist');
+    // After stopTest, the first queueable (FlowScanQueueable) runs
+    // synchronously and processes the first batch inline
+    // so scan should be Complete with mock data (1 flow)
+    System.assert(
+      scans[0].Status__c == 'Complete' || scans[0].Status__c == 'Failed',
+      'Scan should be Complete or Failed. Actual: ' + scans[0].Status__c
+    );
+  }
+
+  @isTest
+  static void testGetScanStatus_Running() {
+    Flow_Scan__c scan = new Flow_Scan__c(
+      Scan_Date__c = DateTime.now(),
+      Status__c = 'Running'
+    );
+    insert scan;
+
+    Test.startTest();
+    Map<String, Object> status = FlowScannerService.getScanStatus(scan.Id);
+    Test.stopTest();
+
+    System.assertEquals(
+      'Running',
+      status.get('status'),
+      'Should return Running status'
+    );
+  }
+
+  @isTest
+  static void testGetScanStatus_Complete() {
+    Flow_Scan__c scan = new Flow_Scan__c(
+      Scan_Date__c = DateTime.now(),
+      Status__c = 'Complete',
+      Total_Flows_Scanned__c = 5,
+      Total_Violations__c = 2
+    );
+    insert scan;
+
+    Test.startTest();
+    Map<String, Object> status = FlowScannerService.getScanStatus(scan.Id);
+    Test.stopTest();
+
+    System.assertEquals('Complete', status.get('status'));
+    System.assertEquals(
+      5,
+      Integer.valueOf(String.valueOf(status.get('totalFlows')))
+    );
+  }
+
+  @isTest
+  static void testLoadRules() {
+    Test.startTest();
+    List<IFlowRule> rules = FlowScannerService.loadRules();
+    Test.stopTest();
+
+    System.assertNotEquals(null, rules, 'Rules should not be null');
+    System.assert(rules.size() > 0, 'Should load at least one active rule');
+  }
+
+  @isTest
+  static void testPersistScanResults() {
+    Flow_Scan__c scan = new Flow_Scan__c(
+      Scan_Date__c = DateTime.now(),
+      Status__c = 'Running'
+    );
+    insert scan;
+
+    List<RuleViolation> violations = new List<RuleViolation>();
+    RuleViolation v = new RuleViolation(
+      'No Fault Path',
+      'Error',
+      'Create_Record',
+      'Element has no fault connector'
+    );
+    v.flowApiName = 'Test_Flow';
+    v.flowDefinitionId = '300000000000000AAA';
+    violations.add(v);
+
+    Test.startTest();
+    FlowScannerService.persistScanResults(scan.Id, 3, violations);
+    Test.stopTest();
+
+    Flow_Scan__c updated = [
+      SELECT
+        Total_Flows_Scanned__c,
+        Total_Violations__c,
+        Health_Score__c,
+        Errors__c,
+        Warnings__c
+      FROM Flow_Scan__c
+      WHERE Id = :scan.Id
+    ];
+    System.assertEquals(3, updated.Total_Flows_Scanned__c);
+    System.assertEquals(1, updated.Total_Violations__c);
+    System.assertNotEquals(
+      null,
+      updated.Health_Score__c,
+      'Health score should be persisted'
+    );
+    System.assertEquals(
+      80,
+      updated.Health_Score__c,
+      'Score for 1 error in 3 flows: 100 - (1 * 33.33 * 0.6) = 80'
+    );
+
+    List<Flow_Scan_Result__c> results = [
+      SELECT Rule_Name__c
+      FROM Flow_Scan_Result__c
+      WHERE Flow_Scan__c = :scan.Id
+    ];
+    System.assertEquals(1, results.size());
+    System.assertEquals('No Fault Path', results[0].Rule_Name__c);
+  }
+
+  @isTest
+  static void testPersistScanResults_NoViolations() {
+    Flow_Scan__c scan = new Flow_Scan__c(
+      Scan_Date__c = DateTime.now(),
+      Status__c = 'Running'
+    );
+    insert scan;
+
+    Test.startTest();
+    FlowScannerService.persistScanResults(
+      scan.Id,
+      10,
+      new List<RuleViolation>()
+    );
+    Test.stopTest();
+
+    Flow_Scan__c updated = [
+      SELECT Total_Violations__c, Health_Score__c
+      FROM Flow_Scan__c
+      WHERE Id = :scan.Id
+    ];
+    System.assertEquals(
+      0,
+      updated.Total_Violations__c,
+      'Should handle empty violations list'
+    );
+    System.assertEquals(
+      100,
+      updated.Health_Score__c,
+      'Should have 100% health score when zero violations'
+    );
+  }
+  @isTest
+  static void testFetchFlowDefinitions() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
+
+    Test.startTest();
+    List<Map<String, Object>> definitions = FlowMetadataService.fetchFlowDefinitions(
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(
+      null,
+      definitions,
+      'Should return a list of flow definitions'
+    );
+    System.assert(
+      definitions.size() > 0,
+      'Should return at least one flow definition'
+    );
+
+    Map<String, Object> firstDef = definitions[0];
+    System.assertNotEquals(
+      null,
+      firstDef.get('DeveloperName'),
+      'Flow definition should have DeveloperName'
+    );
+    System.assertNotEquals(
+      null,
+      firstDef.get('ActiveVersionId'),
+      'Flow definition should have ActiveVersionId'
+    );
+  }
+
+  @isTest
+  static void testFetchFlowDefinitions_Empty() {
+    Test.setMock(HttpCalloutMock.class, new EmptyFlowListMock());
+
+    Test.startTest();
+    List<Map<String, Object>> definitions = FlowMetadataService.fetchFlowDefinitions(
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      0,
+      definitions.size(),
+      'Should return empty list when no active flows'
+    );
+  }
+
+  @isTest
+  static void testFetchFlowDefinitions_ApiError() {
+    Test.setMock(
+      HttpCalloutMock.class,
+      new FlowMetadataMock(FlowMetadataMock.MockType.ERROR)
+    );
+
+    Test.startTest();
+    try {
+      FlowMetadataService.fetchFlowDefinitions('fakeSessionId000001');
+      System.assert(false, 'Should have thrown exception');
+    } catch (FlowMetadataService.FlowScannerException e) {
+      System.assert(
+        e.getMessage().contains('Tooling API query failed'),
+        'Should throw FlowScannerException on API error'
+      );
     }
+    Test.stopTest();
+  }
 
-    @isTest
-    static void testGetScanStatus_Running() {
-        Flow_Scan__c scan = new Flow_Scan__c(
-            Scan_Date__c = DateTime.now(),
-            Status__c    = 'Running'
-        );
-        insert scan;
+  @isTest
+  static void testFetchSingleFlow() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
 
-        Test.startTest();
-        Map<String, Object> status = FlowScannerService.getScanStatus(scan.Id);
-        Test.stopTest();
+    Map<String, Object> mockFlowRec = new Map<String, Object>{
+      'Id' => '3010H000000fake01',
+      'DeveloperName' => 'Test_Flow',
+      'MasterLabel' => 'Test Flow',
+      'Description' => 'A test flow',
+      'ActiveVersionId' => '3010H000000fake02'
+    };
 
-        System.assertEquals('Running', status.get('status'),
-            'Should return Running status');
+    Test.startTest();
+    FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
+      mockFlowRec,
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(null, flow, 'Should return a FlowWrapper');
+    System.assertEquals(
+      'Test_Flow',
+      flow.flowApiName,
+      'Flow API name should match'
+    );
+    System.assertEquals('Test Flow', flow.flowLabel, 'Flow label should match');
+  }
+
+  @isTest
+  static void testFetchSingleFlow_InvalidId() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
+
+    // Invalid ID — should be skipped
+    Map<String, Object> mockFlowRec = new Map<String, Object>{
+      'Id' => 'invalid!!!',
+      'DeveloperName' => 'Bad_Flow',
+      'MasterLabel' => 'Bad Flow',
+      'Description' => null,
+      'ActiveVersionId' => 'also-invalid'
+    };
+
+    Test.startTest();
+    // fetchSingleFlow calls fetchFlowMetadata which will get a null response
+    // from the mock for an unrecognised ID pattern — returns null
+    FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
+      mockFlowRec,
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    // Either null returned or flow with empty elements — both acceptable
+    System.assert(
+      flow == null || flow.elements != null,
+      'Should handle invalid ID gracefully'
+    );
+  }
+  @isTest
+  static void testFetchFlowDefinitions_ValidatesOrgDomain() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
+
+    // This test just confirms fetchFlowDefinitions runs without
+    // domain validation error in a valid scratch org context
+    Test.startTest();
+    List<Map<String, Object>> defs = FlowMetadataService.fetchFlowDefinitions(
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(
+      null,
+      defs,
+      'Should complete without domain validation error in scratch org'
+    );
+  }
+
+  @isTest
+  static void testFetchAllFlows_Direct() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
+
+    Test.startTest();
+    List<FlowWrapper> flows = FlowMetadataService.fetchAllFlows(
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(null, flows, 'Should return list of flows');
+    System.assert(flows.size() > 0, 'Should return at least one flow');
+    System.assertEquals(
+      'Test_Flow',
+      flows[0].flowApiName,
+      'Flow API name should match mock data'
+    );
+  }
+
+  @isTest
+  static void testFetchAllFlows_Empty() {
+    Test.setMock(HttpCalloutMock.class, new EmptyFlowListMock());
+
+    Test.startTest();
+    List<FlowWrapper> flows = FlowMetadataService.fetchAllFlows(
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      0,
+      flows.size(),
+      'Should return empty list when no active flows'
+    );
+  }
+
+  @isTest
+  static void testFetchAllFlows_ApiError() {
+    Test.setMock(
+      HttpCalloutMock.class,
+      new FlowMetadataMock(FlowMetadataMock.MockType.ERROR)
+    );
+
+    Test.startTest();
+    try {
+      FlowMetadataService.fetchAllFlows('fakeSessionId000001');
+      System.assert(false, 'Should have thrown exception');
+    } catch (FlowMetadataService.FlowScannerException e) {
+      System.assert(
+        e.getMessage().contains('Tooling API query failed'),
+        'Should throw FlowScannerException on API error'
+      );
     }
+    Test.stopTest();
+  }
 
-    @isTest
-    static void testGetScanStatus_Complete() {
-        Flow_Scan__c scan = new Flow_Scan__c(
-            Scan_Date__c           = DateTime.now(),
-            Status__c              = 'Complete',
-            Total_Flows_Scanned__c = 5,
-            Total_Violations__c    = 2
-        );
-        insert scan;
-
-        Test.startTest();
-        Map<String, Object> status = FlowScannerService.getScanStatus(scan.Id);
-        Test.stopTest();
-
-        System.assertEquals('Complete', status.get('status'));
-        System.assertEquals(5, Integer.valueOf(
-            String.valueOf(status.get('totalFlows'))));
+  private class ComplexFlowGraphMock implements HttpCalloutMock {
+    public HTTPResponse respond(HTTPRequest req) {
+      HttpResponse res = new HttpResponse();
+      res.setHeader('Content-Type', 'application/json');
+      res.setStatusCode(200);
+      res.setBody(
+        '{"Id":"3010H000000fake003","Metadata":{' +
+          '"processType":"Flow",' +
+          '"label":"Case Screen Flow - Create Opportunity",' +
+          '"description":"Creates opportunity from case",' +
+          '"startElementReference":"Check_Case_Has_Account",' +
+          '"start":{"connector":{"targetReference":"Check_Case_Has_Account"},"scheduledPaths":[{"connector":{"targetReference":"Scheduled_Action"}}]},' +
+          '"decisions":[{"name":"Check_Case_Has_Account","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"rules":[{"name":"Has_Account","connector":{"targetReference":"Create_Opportunity_Screen"}}]}],' +
+          '"screens":[{"name":"Create_Opportunity_Screen","fields":[{"name":"OppName"}]}],' +
+          '"subflows":[{"name":"Call_Subflow","flowName":"Subflow_Api_Name","faultConnector":{"targetReference":"Subflow_Fault"}}],' +
+          '"customErrors":[{"name":"Subflow_Fault"}],' +
+          '"transforms":[{"name":"Transform_Data"}],' +
+          '"recordRollbacks":[{"name":"Rollback_DML"}],' +
+          '"collectionProcessors":[{"name":"Filter_List"}],' +
+          '"waits":[{"name":"Wait_Element","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"waitEvents":[{"connector":{"targetReference":"Transform_Data"}}]}],' +
+          '"variables":[{"name":"varAccount","dataType":"String","isInput":true,"isOutput":false}]' +
+          '}}'
+      );
+      return res;
     }
+  }
 
-    @isTest
-    static void testLoadRules() {
-        Test.startTest();
-        List<IFlowRule> rules = FlowScannerService.loadRules();
-        Test.stopTest();
+  @isTest
+  static void testFetchSingleFlow_ComplexFlowGraph() {
+    Test.setMock(HttpCalloutMock.class, new ComplexFlowGraphMock());
 
-        System.assertNotEquals(null, rules, 'Rules should not be null');
-        System.assert(rules.size() > 0, 'Should load at least one active rule');
+    Map<String, Object> mockFlowRec = new Map<String, Object>{
+      'Id' => '3010H000000fake001',
+      'DeveloperName' => 'Case_Screen_Flow_Create_Opportunity',
+      'MasterLabel' => null, // test fallback to metadata label
+      'Description' => null, // test fallback to metadata description
+      'ActiveVersionId' => '3010H000000fake003'
+    };
+
+    Test.startTest();
+    FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
+      mockFlowRec,
+      'fakeSessionId000001'
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(null, flow);
+    System.assertEquals(
+      'Case Screen Flow - Create Opportunity',
+      flow.flowLabel,
+      'Should fall back to metadata label when flowRec MasterLabel is null'
+    );
+    System.assertEquals(
+      'Creates opportunity from case',
+      flow.description,
+      'Should fall back to metadata description'
+    );
+    System.assert(
+      flow.connectedElements.contains('Check_Case_Has_Account'),
+      'Decision element should be reached via startElementReference / start connector'
+    );
+    System.assert(
+      flow.connectedElements.contains('Create_Opportunity_Screen'),
+      'Screen element should be reached via decision defaultConnector & rules'
+    );
+    System.assert(
+      flow.connectedElements.contains('Scheduled_Action'),
+      'Scheduled action should be reached via scheduledPaths'
+    );
+  }
+
+  @isTest
+  static void testCalculateHealthScore() {
+    // 0 flows edge case -> default to 1 flow, 0 violations -> 100
+    System.assertEquals(100, FlowScannerService.calculateHealthScore(0, 0, 0));
+    System.assertEquals(
+      100,
+      FlowScannerService.calculateHealthScore(null, null, null)
+    );
+
+    // 10 flows, 2 errors (2 * 10 * 0.6 = 12 penalty), 3 warnings (3 * 10 * 0.2 = 6 penalty) -> 100 - 18 = 82
+    System.assertEquals(82, FlowScannerService.calculateHealthScore(10, 2, 3));
+
+    // Severe penalty clamped at minimum 0
+    System.assertEquals(0, FlowScannerService.calculateHealthScore(1, 10, 20));
+  }
+
+  @isTest
+  static void testToolingAuthentication_MissingSession_ThrowsException() {
+    try {
+      FlowMetadataService.fetchAllFlows(null);
+      System.assert(false, 'Should have thrown exception for null session ID');
+    } catch (FlowMetadataService.FlowScannerException ex) {
+      System.assert(
+        ex.getMessage().contains('No valid Salesforce Session ID was found'),
+        'Exception message should explain missing session ID and advise Named Credential setup'
+      );
     }
+  }
 
-    @isTest
-    static void testPersistScanResults() {
-        Flow_Scan__c scan = new Flow_Scan__c(
-            Scan_Date__c = DateTime.now(),
-            Status__c    = 'Running'
-        );
-        insert scan;
+  @isTest
+  static void testToolingAuthentication_NamedCredential() {
+    Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
+    FlowMetadataService.toolingNamedCredential = 'FlowHealthToolingApi';
 
-        List<RuleViolation> violations = new List<RuleViolation>();
-        RuleViolation v = new RuleViolation(
-            'No Fault Path', 'Error', 'Create_Record',
-            'Element has no fault connector'
-        );
-        v.flowApiName     = 'Test_Flow';
-        v.flowDefinitionId = '300000000000000AAA';
-        violations.add(v);
+    Test.startTest();
+    List<Map<String, Object>> defs = FlowMetadataService.fetchFlowDefinitions(
+      null
+    );
+    Test.stopTest();
 
-        Test.startTest();
-        FlowScannerService.persistScanResults(scan.Id, 3, violations);
-        Test.stopTest();
+    System.assertNotEquals(null, defs);
+    FlowMetadataService.toolingNamedCredential = null; // reset
+  }
 
-        Flow_Scan__c updated = [
-            SELECT Total_Flows_Scanned__c, Total_Violations__c
-            FROM Flow_Scan__c WHERE Id = :scan.Id
-        ];
-        System.assertEquals(3, updated.Total_Flows_Scanned__c);
-        System.assertEquals(1, updated.Total_Violations__c);
+  @isTest
+  static void testExtractSessionIdFromContent() {
+    String sample = '<html>SESSION_ID_START00DfakeSessionId12345SESSION_ID_END</html>';
+    String extracted = FlowScannerService.extractSessionIdFromContent(sample);
+    System.assertEquals('00DfakeSessionId12345', extracted);
 
-        List<Flow_Scan_Result__c> results = [
-            SELECT Rule_Name__c FROM Flow_Scan_Result__c
-            WHERE Flow_Scan__c = :scan.Id
-        ];
-        System.assertEquals(1, results.size());
-        System.assertEquals('No Fault Path', results[0].Rule_Name__c);
-    }
+    System.assertEquals(
+      null,
+      FlowScannerService.extractSessionIdFromContent(null)
+    );
+    System.assertEquals(
+      null,
+      FlowScannerService.extractSessionIdFromContent('')
+    );
+    System.assertEquals(
+      null,
+      FlowScannerService.extractSessionIdFromContent(
+        'invalid content without markers'
+      )
+    );
+  }
 
-    @isTest
-    static void testPersistScanResults_NoViolations() {
-        Flow_Scan__c scan = new Flow_Scan__c(
-            Scan_Date__c = DateTime.now(),
-            Status__c    = 'Running'
-        );
-        insert scan;
-
-        Test.startTest();
-        FlowScannerService.persistScanResults(scan.Id, 10, new List<RuleViolation>());
-        Test.stopTest();
-
-        Flow_Scan__c updated = [
-            SELECT Total_Violations__c
-            FROM Flow_Scan__c WHERE Id = :scan.Id
-        ];
-        System.assertEquals(0, updated.Total_Violations__c,
-            'Should handle empty violations list');
-    }
-    @isTest
-    static void testFetchFlowDefinitions() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-
-        Test.startTest();
-        List<Map<String, Object>> definitions =
-            FlowMetadataService.fetchFlowDefinitions('fakeSessionId000001');
-        Test.stopTest();
-
-        System.assertNotEquals(null, definitions,
-            'Should return a list of flow definitions');
-        System.assert(definitions.size() > 0,
-            'Should return at least one flow definition');
-
-        Map<String, Object> firstDef = definitions[0];
-        System.assertNotEquals(null, firstDef.get('DeveloperName'),
-            'Flow definition should have DeveloperName');
-        System.assertNotEquals(null, firstDef.get('ActiveVersionId'),
-            'Flow definition should have ActiveVersionId');
-    }
-
-    @isTest
-    static void testFetchFlowDefinitions_Empty() {
-        Test.setMock(HttpCalloutMock.class, new EmptyFlowListMock());
-
-        Test.startTest();
-        List<Map<String, Object>> definitions =
-            FlowMetadataService.fetchFlowDefinitions('fakeSessionId000001');
-        Test.stopTest();
-
-        System.assertEquals(0, definitions.size(),
-            'Should return empty list when no active flows');
-    }
-
-    @isTest
-    static void testFetchFlowDefinitions_ApiError() {
-        Test.setMock(HttpCalloutMock.class,
-            new FlowMetadataMock(FlowMetadataMock.MockType.ERROR));
-
-        Test.startTest();
-        try {
-            FlowMetadataService.fetchFlowDefinitions('fakeSessionId000001');
-            System.assert(false, 'Should have thrown exception');
-        } catch (FlowMetadataService.FlowScannerException e) {
-            System.assert(e.getMessage().contains('Tooling API query failed'),
-                'Should throw FlowScannerException on API error');
-        }
-        Test.stopTest();
-    }
-
-    @isTest
-    static void testFetchSingleFlow() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-
-        Map<String, Object> mockFlowRec = new Map<String, Object>{
-            'Id'              => '3010H000000fake01',
-            'DeveloperName'   => 'Test_Flow',
-            'MasterLabel'     => 'Test Flow',
-            'Description'     => 'A test flow',
-            'ActiveVersionId' => '3010H000000fake02'
-        };
-
-        Test.startTest();
-        FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
-            mockFlowRec, 'fakeSessionId000001'
-        );
-        Test.stopTest();
-
-        System.assertNotEquals(null, flow,
-            'Should return a FlowWrapper');
-        System.assertEquals('Test_Flow', flow.flowApiName,
-            'Flow API name should match');
-        System.assertEquals('Test Flow', flow.flowLabel,
-            'Flow label should match');
-    }
-
-    @isTest
-    static void testFetchSingleFlow_InvalidId() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-
-        // Invalid ID — should be skipped
-        Map<String, Object> mockFlowRec = new Map<String, Object>{
-            'Id'              => 'invalid!!!',
-            'DeveloperName'   => 'Bad_Flow',
-            'MasterLabel'     => 'Bad Flow',
-            'Description'     => null,
-            'ActiveVersionId' => 'also-invalid'
-        };
-
-        Test.startTest();
-        // fetchSingleFlow calls fetchFlowMetadata which will get a null response
-        // from the mock for an unrecognised ID pattern — returns null
-        FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
-            mockFlowRec, 'fakeSessionId000001'
-        );
-        Test.stopTest();
-
-        // Either null returned or flow with empty elements — both acceptable
-        System.assert(flow == null || flow.elements != null,
-            'Should handle invalid ID gracefully');
-    }
-    @isTest
-    static void testFetchFlowDefinitions_ValidatesOrgDomain() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-
-        // This test just confirms fetchFlowDefinitions runs without
-        // domain validation error in a valid scratch org context
-        Test.startTest();
-        List<Map<String, Object>> defs =
-            FlowMetadataService.fetchFlowDefinitions('fakeSessionId000001');
-        Test.stopTest();
-
-        System.assertNotEquals(null, defs,
-            'Should complete without domain validation error in scratch org');
-    }
-
-    @isTest
-    static void testFetchAllFlows_Direct() {
-        Test.setMock(HttpCalloutMock.class, new FlowScannerMultiMock());
-
-        Test.startTest();
-        List<FlowWrapper> flows =
-            FlowMetadataService.fetchAllFlows('fakeSessionId000001');
-        Test.stopTest();
-
-        System.assertNotEquals(null, flows,
-            'Should return list of flows');
-        System.assert(flows.size() > 0,
-            'Should return at least one flow');
-        System.assertEquals('Test_Flow', flows[0].flowApiName,
-            'Flow API name should match mock data');
-    }
-
-    @isTest
-    static void testFetchAllFlows_Empty() {
-        Test.setMock(HttpCalloutMock.class, new EmptyFlowListMock());
-
-        Test.startTest();
-        List<FlowWrapper> flows =
-            FlowMetadataService.fetchAllFlows('fakeSessionId000001');
-        Test.stopTest();
-
-        System.assertEquals(0, flows.size(),
-            'Should return empty list when no active flows');
-    }
-
-    @isTest
-    static void testFetchAllFlows_ApiError() {
-        Test.setMock(HttpCalloutMock.class,
-            new FlowMetadataMock(FlowMetadataMock.MockType.ERROR));
-
-        Test.startTest();
-        try {
-            FlowMetadataService.fetchAllFlows('fakeSessionId000001');
-            System.assert(false, 'Should have thrown exception');
-        } catch (FlowMetadataService.FlowScannerException e) {
-            System.assert(e.getMessage().contains('Tooling API query failed'),
-                'Should throw FlowScannerException on API error');
-        }
-        Test.stopTest();
-    }
-
-    private class ComplexFlowGraphMock implements HttpCalloutMock {
-        public HTTPResponse respond(HTTPRequest req) {
-            HttpResponse res = new HttpResponse();
-            res.setHeader('Content-Type', 'application/json');
-            res.setStatusCode(200);
-            res.setBody(
-                '{"Id":"3010H000000fake003","Metadata":{'
-                + '"processType":"Flow",'
-                + '"label":"Case Screen Flow - Create Opportunity",'
-                + '"description":"Creates opportunity from case",'
-                + '"startElementReference":"Check_Case_Has_Account",'
-                + '"start":{"connector":{"targetReference":"Check_Case_Has_Account"},"scheduledPaths":[{"connector":{"targetReference":"Scheduled_Action"}}]},'
-                + '"decisions":[{"name":"Check_Case_Has_Account","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"rules":[{"name":"Has_Account","connector":{"targetReference":"Create_Opportunity_Screen"}}]}],'
-                + '"screens":[{"name":"Create_Opportunity_Screen","fields":[{"name":"OppName"}]}],'
-                + '"subflows":[{"name":"Call_Subflow","flowName":"Subflow_Api_Name","faultConnector":{"targetReference":"Subflow_Fault"}}],'
-                + '"customErrors":[{"name":"Subflow_Fault"}],'
-                + '"transforms":[{"name":"Transform_Data"}],'
-                + '"recordRollbacks":[{"name":"Rollback_DML"}],'
-                + '"collectionProcessors":[{"name":"Filter_List"}],'
-                + '"waits":[{"name":"Wait_Element","defaultConnector":{"targetReference":"Create_Opportunity_Screen"},"waitEvents":[{"connector":{"targetReference":"Transform_Data"}}]}],'
-                + '"variables":[{"name":"varAccount","dataType":"String","isInput":true,"isOutput":false}]'
-                + '}}'
-            );
-            return res;
-        }
-    }
-
-    @isTest
-    static void testFetchSingleFlow_ComplexFlowGraph() {
-        Test.setMock(HttpCalloutMock.class, new ComplexFlowGraphMock());
-
-        Map<String, Object> mockFlowRec = new Map<String, Object>{
-            'Id'              => '3010H000000fake001',
-            'DeveloperName'   => 'Case_Screen_Flow_Create_Opportunity',
-            'MasterLabel'     => null, // test fallback to metadata label
-            'Description'     => null, // test fallback to metadata description
-            'ActiveVersionId' => '3010H000000fake003'
-        };
-
-        Test.startTest();
-        FlowWrapper flow = FlowMetadataService.fetchSingleFlow(
-            mockFlowRec, 'fakeSessionId000001'
-        );
-        Test.stopTest();
-
-        System.assertNotEquals(null, flow);
-        System.assertEquals('Case Screen Flow - Create Opportunity', flow.flowLabel,
-            'Should fall back to metadata label when flowRec MasterLabel is null');
-        System.assertEquals('Creates opportunity from case', flow.description,
-            'Should fall back to metadata description');
-        System.assert(flow.connectedElements.contains('Check_Case_Has_Account'),
-            'Decision element should be reached via startElementReference / start connector');
-        System.assert(flow.connectedElements.contains('Create_Opportunity_Screen'),
-            'Screen element should be reached via decision defaultConnector & rules');
-        System.assert(flow.connectedElements.contains('Scheduled_Action'),
-            'Scheduled action should be reached via scheduledPaths');
-    }
+  @isTest
+  static void testGetApiSessionId() {
+    String sid = FlowScannerService.getApiSessionId();
+    System.assertNotEquals(null, sid, 'Should return a non-null session ID');
+  }
 }

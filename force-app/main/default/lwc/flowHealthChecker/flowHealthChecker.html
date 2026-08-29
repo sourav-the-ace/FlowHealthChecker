@@ -1,476 +1,560 @@
 <template>
-    <div class="fhc-shell" role="main" aria-label="Flow Health Checker application">
-
-        <!-- Page Header -->
-        <div class="fhc-page-header" role="banner">
-            <div class="fhc-page-header-left">
-                <div class="fhc-page-icon" aria-hidden="true">⚡</div>
-                <div>
-                    <h1 class="fhc-page-title">Flow Health Checker</h1>
-                    <p class="fhc-page-sub">
-                        Scan active flows for best-practice violations — namespace: svfhc
-                    </p>
-                </div>
-            </div>
-            <div class="fhc-header-actions">
-                <button class="fhc-btn-secondary"
-                        onclick={openRulesModal}
-                        aria-label="View all scan rules"
-                        aria-haspopup="dialog">
-                    📋 View Rules
-                </button>
-                <button class="fhc-btn-secondary" onclick={openHistoryModal}
-                        aria-label="View scan history and trend" aria-haspopup="dialog">
-                    📈 History
-                </button>
-                <button class="fhc-btn-primary"
-                        onclick={handleScan}
-                        disabled={isScanning}
-                        aria-label={scanButtonLabel}
-                        aria-busy={isScanning}>
-                    <template if:true={isScanning}>
-                        <span class="fhc-btn-spinner"
-                              aria-hidden="true"></span>Scanning…
-                    </template>
-                    <template if:false={isScanning}>
-                        ▶ Run Scan
-                    </template>
-                </button>
-            </div>
+  <div
+    class="fhc-shell"
+    role="main"
+    aria-label="Flow Health Checker application"
+  >
+    <!-- Page Header -->
+    <div class="fhc-page-header" role="banner">
+      <div class="fhc-page-header-left">
+        <div class="fhc-page-icon" aria-hidden="true">🔍</div>
+        <div>
+          <h1 class="fhc-page-title">Flow Health Checker</h1>
+          <p class="fhc-page-sub">
+            Scan active flows for best-practice violations — namespace: svfhc
+          </p>
         </div>
-
-        <!-- Error Banner -->
-        <template if:true={errorMessage}>
-            <div class="fhc-error-banner"
-                 role="alert"
-                 aria-live="assertive">
-                ⚠️ {errorMessage}
-            </div>
-        </template>
-
-        <!-- Summary Cards -->
-        <div class="fhc-cards"
-             role="region"
-             aria-label="Scan summary statistics">
-            <div class="fhc-card fhc-card-blue"
-                 role="status"
-                 aria-label="Flows scanned">
-                <div class="fhc-card-val"
-                     aria-live="polite">{scanSummary.totalFlows}</div>
-                <div class="fhc-card-lbl">
-                    Flows Scanned
-                    <span class="fhc-tooltip-wrap">
-                        <span class="fhc-tip-icon"
-                              tabindex="0"
-                              role="tooltip"
-                              aria-label="Total number of active flows found in this org via the Tooling API. Inactive or obsolete flow versions are excluded.">?</span>
-                        <span class="fhc-tooltip">
-                            Total number of active flows found in this org via
-                            the Tooling API. Inactive or obsolete flow versions
-                            are excluded.
-                        </span>
-                    </span>
-                </div>
-            </div>
-            <div class="fhc-card fhc-card-red"
-                 role="status"
-                 aria-label="Error count">
-                <div class="fhc-card-val"
-                     aria-live="polite">{scanSummary.errors}</div>
-                <div class="fhc-card-lbl">
-                    Errors
-                    <span class="fhc-tooltip-wrap">
-                        <span class="fhc-tip-icon"
-                              tabindex="0"
-                              role="tooltip"
-                              aria-label="High-severity violations that can cause runtime failures, data loss, or governor limit errors. Fix these first.">?</span>
-                        <span class="fhc-tooltip">
-                            High-severity violations that can cause runtime
-                            failures, data loss, or governor limit errors.
-                            Fix these first.
-                        </span>
-                    </span>
-                </div>
-            </div>
-            <div class="fhc-card fhc-card-amber"
-                 role="status"
-                 aria-label="Warning count">
-                <div class="fhc-card-val"
-                     aria-live="polite">{scanSummary.warnings}</div>
-                <div class="fhc-card-lbl">
-                    Warnings
-                    <span class="fhc-tooltip-wrap">
-                        <span class="fhc-tip-icon"
-                              tabindex="0"
-                              role="tooltip"
-                              aria-label="Medium-severity issues that hurt maintainability, performance, or portability.">?</span>
-                        <span class="fhc-tooltip">
-                            Medium-severity issues that hurt maintainability,
-                            performance, or portability. Should be addressed
-                            but won't cause immediate failures.
-                        </span>
-                    </span>
-                </div>
-            </div>
-            <div class="fhc-card fhc-card-green"
-                 role="status"
-                 aria-label="Health score">
-                <div class="fhc-card-val"
-                     aria-live="polite">{scanSummary.score}</div>
-                <div class="fhc-card-lbl">
-                    Health Score
-                    <span class="fhc-tooltip-wrap">
-                        <span class="fhc-tip-icon"
-                              tabindex="0"
-                              role="tooltip"
-                              aria-label="Score based on 100 points minus weighted penalties for errors and warnings. 100% means no violations found.">?</span>
-                        <span class="fhc-tooltip fhc-tooltip-wide">
-                            Score = 100 − errorPoints − warningPoints
-
-                            errorPoints = errors × (100 ÷ totalFlows) × 60%
-                            warningPoints = warnings × (100 ÷ totalFlows) × 20%
-
-                            Each Error costs 3× more than each Warning.
-                            100% = no violations found.
-                        </span>
-                    </span>
-                </div>
-            </div>
-            <div class="fhc-card fhc-card-purple"
-                 role="status"
-                 aria-label="Flows affected count">
-                <div class="fhc-card-val"
-                     aria-live="polite">{scanSummary.affectedFlows}</div>
-                <div class="fhc-card-lbl">
-                    Flows Affected
-                    <span class="fhc-tooltip-wrap">
-                        <span class="fhc-tip-icon"
-                              tabindex="0"
-                              role="tooltip"
-                              aria-label="Number of distinct flows that have at least one violation. The remaining flows are fully clean.">?</span>
-                        <span class="fhc-tooltip">
-                            Number of distinct flows that have at least
-                            one violation. The remaining flows are
-                            fully clean.
-                        </span>
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Results Panel -->
-        <template if:true={hasScanResult}>
-
-            <!-- Toolbar -->
-            <div class="fhc-toolbar"
-                 role="toolbar"
-                 aria-label="Filter and search scan results">
-                <div class="fhc-search-wrap">
-                    <span class="fhc-search-icon"
-                          aria-hidden="true">🔍</span>
-                    <input type="search"
-                           class="fhc-search-input"
-                           placeholder="Search by flow name…"
-                           value={searchQuery}
-                           oninput={handleSearch}
-                           aria-label="Search violations by flow name"
-                           aria-controls="fhc-flow-list"/>
-                </div>
-                <div class="fhc-toolbar-divider"
-                     role="separator"
-                     aria-hidden="true"></div>
-                <button class={filterAllClass}
-                        onclick={filterAll}
-                        aria-label="Show all violations"
-                        aria-pressed={isFilterAll}>All</button>
-                <button class={filterErrorClass}
-                        onclick={filterError}
-                        aria-label="Show errors only"
-                        aria-pressed={isFilterError}>🔴 Error</button>
-                <button class={filterWarningClass}
-                        onclick={filterWarning}
-                        aria-label="Show warnings only"
-                        aria-pressed={isFilterWarning}>🟡 Warning</button>
-                <button class={filterInfoClass}
-                        onclick={filterInfo}
-                        aria-label="Show info violations only"
-                        aria-pressed={isFilterInfo}>🔵 Info</button>
-                <div class="fhc-toolbar-right">
-                    <button class="fhc-exp-btn"
-                            onclick={expandAll}
-                            aria-label="Expand all flow groups">
-                        Expand all
-                    </button>
-                    <button class="fhc-exp-btn"
-                            onclick={collapseAll}
-                            aria-label="Collapse all flow groups">
-                        Collapse all
-                    </button>
-                </div>
-            </div>
-
-            <!-- Flow Groups -->
-            <div class="fhc-table-wrap"
-                 id="fhc-flow-list"
-                 role="region"
-                 aria-label="Scan results grouped by flow"
-                 aria-live="polite">
-                <template if:true={hasViolations}>
-                    <template for:each={filteredFlowGroups} for:item="group">
-                        <div key={group.flowApiName}
-                             class="fhc-flow-group"
-                             role="article"
-                             aria-label={group.flowApiName}>
-
-                            <!-- Flow Header -->
-                            <div class="fhc-flow-hdr">
-                                <div class="fhc-flow-hdr-left"
-                                     onclick={handleToggle}
-                                     data-flow={group.flowApiName}
-                                     role="button"
-                                     tabindex="0"
-                                     aria-expanded={group.isExpanded}
-                                     aria-controls={group.violationsId}
-                                     onkeydown={handleToggleKeydown}>
-                                    <span class="fhc-chevron"
-                                          aria-hidden="true">
-                                        {group.chevron}
-                                    </span>
-                                    <span class="fhc-flow-name"
-                                          title={group.flowApiName}>
-                                        {group.flowApiName}
-                                    </span>
-                                </div>
-                                <div class="fhc-badge-wrap">
-                                    <template if:true={group.errorCount}>
-                                        <span class="fhc-mini-badge fhc-mb-err"
-                                              aria-label="\ {group.errorCount} errors">
-                                            🔴 {group.errorCount} Error
-                                        </span>
-                                    </template>
-                                    <template if:true={group.warningCount}>
-                                        <span class="fhc-mini-badge fhc-mb-warn"
-                                              aria-label="\ {group.warningCount} warnings">
-                                            🟡 {group.warningCount} Warning
-                                        </span>
-                                    </template>
-                                    <span class={group.healthChipClass}
-                                          aria-label="Flow health status: {group.healthLabel}">
-                                        {group.healthLabel}
-                                    </span>
-                                    <template if:true={group.flowDefinitionId}>
-                                        <button class="fhc-flow-link-btn"
-                                                onclick={handleOpenFlow}
-                                                data-id={group.flowDefinitionId}
-                                                aria-label="Open {group.flowApiName} in Flow Builder">
-                                            ↗ Open Flow
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Violations Table -->
-                            <template if:true={group.isExpanded}>
-                                <div class="fhc-violations"
-                                     id={group.violationsId}>
-                                    <table class="fhc-viol-table"
-                                           role="grid"
-                                           aria-label="Violations for flow {group.flowApiName}">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col"
-                                                    class="col-sev">Severity</th>
-                                                <th scope="col"
-                                                    class="col-rule">Rule</th>
-                                                <th scope="col"
-                                                    class="col-el">Element</th>
-                                                <th scope="col"
-                                                    class="col-desc">Description</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <template for:each={group.violations}
-                                                      for:item="row">
-                                                <tr key={row.Id}
-                                                    class={row.rowClass}>
-                                                    <td>
-                                                        <span class={row.badgeClass}
-                                                              aria-label="Severity: {row.svfhc__Severity__c}">
-                                                            {row.severityIcon}
-                                                            {row.svfhc__Severity__c}
-                                                        </span>
-                                                    </td>
-                                                    <td class="fhc-rule-name">
-                                                        {row.svfhc__Rule_Name__c}
-                                                    </td>
-                                                    <td>
-                                                        <span class="fhc-el-chip">
-                                                            {row.svfhc__Element_Name__c}
-                                                        </span>
-                                                    </td>
-                                                    <td class="fhc-desc-cell">
-                                                        {row.svfhc__Description__c}
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </template>
-
-                        </div>
-                    </template>
-                </template>
-
-                <template if:false={hasViolations}>
-                    <div class="fhc-no-results"
-                         role="status"
-                         aria-live="polite">
-                        ✅ No violations match the current filter.
-                    </div>
-                </template>
-            </div>
-
-            <div class="fhc-meta-bar"
-                 role="status"
-                 aria-live="polite"
-                 aria-label="Results count">{metaText}</div>
-
-        </template>
-
-        <!-- Initial / Progress state -->
-        <template if:false={hasScanResult}>
-            <template if:true={isScanning}>
-                <div class="fhc-progress-state"
-                     role="status"
-                     aria-live="polite"
-                     aria-label="Scan in progress">
-                    <div class="fhc-progress-icon"
-                         aria-hidden="true">⚡</div>
-                    <p class="fhc-progress-title">Scanning your flows…</p>
-                    <p class="fhc-progress-msg"
-                       aria-live="polite">{progressMessage}</p>
-                    <div class="fhc-progress-bar-wrap"
-                         role="progressbar"
-                         aria-label="Scan progress"
-                         aria-valuetext="Scanning in progress">
-                        <div class="fhc-progress-bar"
-                             aria-hidden="true"></div>
-                    </div>
-                    <p class="fhc-progress-hint">
-                        This may take a few seconds depending on the
-                        number of flows.
-                    </p>
-                </div>
-            </template>
-            <template if:false={isScanning}>
-                <div class="fhc-init-state"
-                     role="region"
-                     aria-label="Ready to scan">
-                    <div class="fhc-init-icon"
-                         aria-hidden="true">⚡</div>
-                    <p class="fhc-init-title">Ready to scan</p>
-                    <p class="fhc-init-sub">
-                        Click <strong>Run Scan</strong> to analyse all
-                        active flows in this org against 11 best-practice
-                        rules. No popups required.
-                    </p>
-                </div>
-            </template>
-        </template>
-
-        <!-- Rules Modal -->
-        <template if:true={showRulesModal}>
-            <div class="fhc-modal-backdrop"
-                 onclick={closeRulesModal}
-                 role="presentation">
-                <div class="fhc-modal"
-                     role="dialog"
-                     aria-modal="true"
-                     aria-labelledby="fhc-modal-title"
-                     onclick={stopPropagation}>
-                    <div class="fhc-modal-header">
-                        <h2 class="fhc-modal-title"
-                            id="fhc-modal-title">
-                            📋 Flow Health Rules
-                        </h2>
-                        <button class="fhc-modal-close"
-                                onclick={closeRulesModal}
-                                aria-label="Close rules modal">✕</button>
-                    </div>
-                    <div class="fhc-modal-body">
-                        <table class="fhc-rules-table"
-                               aria-label="List of all Flow Health Checker scan rules">
-                            <thead>
-                                <tr>
-                                    <th scope="col">Rule</th>
-                                    <th scope="col">Severity</th>
-                                    <th scope="col">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template for:each={rulesList}
-                                          for:item="rule">
-                                    <tr key={rule.label}>
-                                        <td class="fhc-rule-name">
-                                            {rule.label}
-                                        </td>
-                                        <td>
-                                            <span class={rule.badgeClass}
-                                                  aria-label="Severity: {rule.severity}">
-                                                {rule.severityIcon}
-                                                {rule.severity}
-                                            </span>
-                                        </td>
-                                        <td class="fhc-desc-cell">
-                                            {rule.description}
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </template>
-        <template if:true={showHistoryModal}>
-            <div class="fhc-modal-backdrop" onclick={closeHistoryModal} role="presentation">
-                <div class="fhc-modal" role="dialog" aria-modal="true"
-                    aria-labelledby="fhc-history-title" onclick={stopPropagation}>
-                    <div class="fhc-modal-header">
-                        <h2 class="fhc-modal-title" id="fhc-history-title">📈 Health Score Trend</h2>
-                        <button class="fhc-modal-close" onclick={closeHistoryModal}
-                                aria-label="Close history modal">✕</button>
-                    </div>
-                    <div class="fhc-modal-body">
-                        <div class="fhc-trend-chart" role="img"
-                            aria-label="Health score over the last {historyList.length} scans">
-                            <template for:each={historyList} for:item="row">
-                                <div key={row.id} class="fhc-trend-col">
-                                    <div class={row.barClass} style={row.barStyle}
-                                        title={row.score}></div>
-                                    <span class="fhc-trend-label">{row.date}</span>
-                                </div>
-                            </template>
-                        </div>
-                        <table class="fhc-rules-table" aria-label="Scan history detail">
-                            <thead>
-                                <tr><th>Date</th><th>Flows</th><th>Errors</th><th>Warnings</th><th>Score</th></tr>
-                            </thead>
-                            <tbody>
-                                <template for:each={historyList} for:item="row">
-                                    <tr key={row.id}>
-                                        <td>{row.date}</td><td>{row.totalFlows}</td>
-                                        <td>{row.errors}</td><td>{row.warnings}</td>
-                                        <td>{row.score}%</td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </template>
-
+      </div>
+      <div class="fhc-header-actions">
+        <button
+          class="fhc-btn-secondary"
+          onclick={openRulesModal}
+          aria-label="View all scan rules"
+          aria-haspopup="dialog"
+        >
+          📋 View Rules
+        </button>
+        <button
+          class="fhc-btn-secondary"
+          onclick={openHistoryModal}
+          aria-label="View scan history and trend"
+          aria-haspopup="dialog"
+        >
+          📈 History
+        </button>
+        <button
+          class="fhc-btn-primary"
+          onclick={handleScan}
+          disabled={isScanning}
+          aria-label={scanButtonLabel}
+          aria-busy={isScanning}
+        >
+          <template if:true={isScanning}>
+            <span class="fhc-btn-spinner" aria-hidden="true"></span>Scanning…
+          </template>
+          <template if:false={isScanning}> ▶ Run Scan </template>
+        </button>
+      </div>
     </div>
+
+    <!-- Error Banner -->
+    <template if:true={errorMessage}>
+      <div class="fhc-error-banner" role="alert" aria-live="assertive">
+        ⚠️ {errorMessage}
+      </div>
+    </template>
+
+    <!-- Summary Cards -->
+    <div class="fhc-cards" role="region" aria-label="Scan summary statistics">
+      <div
+        class="fhc-card fhc-card-blue"
+        role="status"
+        aria-label="Flows scanned"
+      >
+        <div class="fhc-card-val" aria-live="polite">
+          {scanSummary.totalFlows}
+        </div>
+        <div class="fhc-card-lbl">
+          Flows Scanned
+          <span class="fhc-tooltip-wrap">
+            <span
+              class="fhc-tip-icon"
+              tabindex="0"
+              role="tooltip"
+              aria-label="Total number of active flows found in this org via the Tooling API. Inactive or obsolete flow versions are excluded."
+              >?</span
+            >
+            <span class="fhc-tooltip">
+              Total number of active flows found in this org via the Tooling
+              API. Inactive or obsolete flow versions are excluded.
+            </span>
+          </span>
+        </div>
+      </div>
+      <div class="fhc-card fhc-card-red" role="status" aria-label="Error count">
+        <div class="fhc-card-val" aria-live="polite">{scanSummary.errors}</div>
+        <div class="fhc-card-lbl">
+          Errors
+          <span class="fhc-tooltip-wrap">
+            <span
+              class="fhc-tip-icon"
+              tabindex="0"
+              role="tooltip"
+              aria-label="High-severity violations that can cause runtime failures, data loss, or governor limit errors. Fix these first."
+              >?</span
+            >
+            <span class="fhc-tooltip">
+              High-severity violations that can cause runtime failures, data
+              loss, or governor limit errors. Fix these first.
+            </span>
+          </span>
+        </div>
+      </div>
+      <div
+        class="fhc-card fhc-card-amber"
+        role="status"
+        aria-label="Warning count"
+      >
+        <div class="fhc-card-val" aria-live="polite">
+          {scanSummary.warnings}
+        </div>
+        <div class="fhc-card-lbl">
+          Warnings
+          <span class="fhc-tooltip-wrap">
+            <span
+              class="fhc-tip-icon"
+              tabindex="0"
+              role="tooltip"
+              aria-label="Medium-severity issues that hurt maintainability, performance, or portability."
+              >?</span
+            >
+            <span class="fhc-tooltip">
+              Medium-severity issues that hurt maintainability, performance, or
+              portability. Should be addressed but won't cause immediate
+              failures.
+            </span>
+          </span>
+        </div>
+      </div>
+      <div
+        class="fhc-card fhc-card-green"
+        role="status"
+        aria-label="Health score"
+      >
+        <div class="fhc-card-val" aria-live="polite">{scanSummary.score}</div>
+        <div class="fhc-card-lbl">
+          Health Score
+          <span class="fhc-tooltip-wrap">
+            <span
+              class="fhc-tip-icon"
+              tabindex="0"
+              role="tooltip"
+              aria-label="Score based on 100 points minus weighted penalties for errors and warnings. 100% means no violations found."
+              >?</span
+            >
+            <span class="fhc-tooltip fhc-tooltip-wide">
+              Score = 100 − errorPoints − warningPoints<br />
+
+              errorPoints = errors × (100 ÷ totalFlows) × 60%<br />
+              warningPoints = warnings × (100 ÷ totalFlows) × 20%<br />
+
+              Each Error costs 3× more than each Warning.<br />
+              100% = no violations found.
+            </span>
+          </span>
+        </div>
+      </div>
+      <div
+        class="fhc-card fhc-card-purple"
+        role="status"
+        aria-label="Flows affected count"
+      >
+        <div class="fhc-card-val" aria-live="polite">
+          {scanSummary.affectedFlows}
+        </div>
+        <div class="fhc-card-lbl">
+          Flows Affected
+          <span class="fhc-tooltip-wrap">
+            <span
+              class="fhc-tip-icon"
+              tabindex="0"
+              role="tooltip"
+              aria-label="Number of distinct flows that have at least one violation. The remaining flows are fully clean."
+              >?</span
+            >
+            <span class="fhc-tooltip">
+              Number of distinct flows that have at least one violation. The
+              remaining flows are fully clean.
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <template if:true={hasScanResult}>
+      <!-- Toolbar -->
+      <div
+        class="fhc-toolbar"
+        role="toolbar"
+        aria-label="Filter and search scan results"
+      >
+        <div class="fhc-search-wrap">
+          <span class="fhc-search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="search"
+            class="fhc-search-input"
+            placeholder="Search by flow name…"
+            value={searchQuery}
+            oninput={handleSearch}
+            aria-label="Search violations by flow name"
+            aria-controls="fhc-flow-list"
+          />
+        </div>
+        <div
+          class="fhc-toolbar-divider"
+          role="separator"
+          aria-hidden="true"
+        ></div>
+        <button
+          class={filterAllClass}
+          onclick={filterAll}
+          aria-label="Show all violations"
+          aria-pressed={isFilterAll}
+        >
+          All
+        </button>
+        <button
+          class={filterErrorClass}
+          onclick={filterError}
+          aria-label="Show errors only"
+          aria-pressed={isFilterError}
+        >
+          🔴 Error
+        </button>
+        <button
+          class={filterWarningClass}
+          onclick={filterWarning}
+          aria-label="Show warnings only"
+          aria-pressed={isFilterWarning}
+        >
+          🟡 Warning
+        </button>
+        <button
+          class={filterInfoClass}
+          onclick={filterInfo}
+          aria-label="Show info violations only"
+          aria-pressed={isFilterInfo}
+        >
+          🔵 Info
+        </button>
+        <div class="fhc-toolbar-right">
+          <button
+            class="fhc-exp-btn"
+            onclick={expandAll}
+            aria-label="Expand all flow groups"
+          >
+            Expand all
+          </button>
+          <button
+            class="fhc-exp-btn"
+            onclick={collapseAll}
+            aria-label="Collapse all flow groups"
+          >
+            Collapse all
+          </button>
+        </div>
+      </div>
+
+      <!-- Flow Groups -->
+      <div
+        class="fhc-table-wrap"
+        id="fhc-flow-list"
+        role="region"
+        aria-label="Scan results grouped by flow"
+        aria-live="polite"
+      >
+        <template if:true={hasViolations}>
+          <template for:each={filteredFlowGroups} for:item="group">
+            <div
+              key={group.flowApiName}
+              class="fhc-flow-group"
+              role="article"
+              aria-label={group.flowApiName}
+            >
+              <!-- Flow Header -->
+              <div class="fhc-flow-hdr">
+                <div
+                  class="fhc-flow-hdr-left"
+                  onclick={handleToggle}
+                  data-flow={group.flowApiName}
+                  role="button"
+                  tabindex="0"
+                  aria-expanded={group.isExpanded}
+                  aria-controls={group.violationsId}
+                  onkeydown={handleToggleKeydown}
+                >
+                  <span class="fhc-chevron" aria-hidden="true">
+                    {group.chevron}
+                  </span>
+                  <span class="fhc-flow-name" title={group.flowApiName}>
+                    {group.flowApiName}
+                  </span>
+                </div>
+                <div class="fhc-badge-wrap">
+                  <template if:true={group.errorCount}>
+                    <span
+                      class="fhc-mini-badge fhc-mb-err"
+                      aria-label="\ {group.errorCount} errors"
+                    >
+                      🔴 {group.errorCount} Error
+                    </span>
+                  </template>
+                  <template if:true={group.warningCount}>
+                    <span
+                      class="fhc-mini-badge fhc-mb-warn"
+                      aria-label="\ {group.warningCount} warnings"
+                    >
+                      🟡 {group.warningCount} Warning
+                    </span>
+                  </template>
+                  <span
+                    class={group.healthChipClass}
+                    aria-label="Flow health status: {group.healthLabel}"
+                  >
+                    {group.healthLabel}
+                  </span>
+                  <template if:true={group.flowDefinitionId}>
+                    <button
+                      class="fhc-flow-link-btn"
+                      onclick={handleOpenFlow}
+                      data-id={group.flowDefinitionId}
+                      aria-label="Open {group.flowApiName} in Flow Builder"
+                    >
+                      ↗ Open Flow
+                    </button>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Violations Table -->
+              <template if:true={group.isExpanded}>
+                <div class="fhc-violations" id={group.violationsId}>
+                  <table
+                    class="fhc-viol-table"
+                    role="grid"
+                    aria-label="Violations for flow {group.flowApiName}"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col" class="col-sev">Severity</th>
+                        <th scope="col" class="col-rule">Rule</th>
+                        <th scope="col" class="col-el">Element</th>
+                        <th scope="col" class="col-desc">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template for:each={group.violations} for:item="row">
+                        <tr key={row.Id} class={row.rowClass}>
+                          <td>
+                            <span
+                              class={row.badgeClass}
+                              aria-label="Severity: {row.svfhc__Severity__c}"
+                            >
+                              {row.severityIcon} {row.svfhc__Severity__c}
+                            </span>
+                          </td>
+                          <td class="fhc-rule-name">
+                            {row.svfhc__Rule_Name__c}
+                          </td>
+                          <td>
+                            <span class="fhc-el-chip">
+                              {row.svfhc__Element_Name__c}
+                            </span>
+                          </td>
+                          <td class="fhc-desc-cell">
+                            {row.svfhc__Description__c}
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+          </template>
+        </template>
+
+        <template if:false={hasViolations}>
+          <div class="fhc-no-results" role="status" aria-live="polite">
+            ✅ No violations match the current filter.
+          </div>
+        </template>
+      </div>
+
+      <div
+        class="fhc-meta-bar"
+        role="status"
+        aria-live="polite"
+        aria-label="Results count"
+      >
+        {metaText}
+      </div>
+    </template>
+
+    <!-- Initial / Progress state -->
+    <template if:false={hasScanResult}>
+      <template if:true={isScanning}>
+        <div
+          class="fhc-progress-state"
+          role="status"
+          aria-live="polite"
+          aria-label="Scan in progress"
+        >
+          <div class="fhc-progress-icon" aria-hidden="true">🔍</div>
+          <p class="fhc-progress-title">Scanning your flows…</p>
+          <p class="fhc-progress-msg" aria-live="polite">{progressMessage}</p>
+          <div
+            class="fhc-progress-bar-wrap"
+            role="progressbar"
+            aria-label="Scan progress"
+            aria-valuetext="Scanning in progress"
+          >
+            <div class="fhc-progress-bar" aria-hidden="true"></div>
+          </div>
+          <p class="fhc-progress-hint">
+            This may take a few seconds depending on the number of flows.
+          </p>
+        </div>
+      </template>
+      <template if:false={isScanning}>
+        <div class="fhc-init-state" role="region" aria-label="Ready to scan">
+          <div class="fhc-init-icon" aria-hidden="true">🔍</div>
+          <p class="fhc-init-title">Ready to scan</p>
+          <p class="fhc-init-sub">
+            Click <strong>Run Scan</strong> to analyse all active flows in this
+            org against best-practice rules.
+          </p>
+        </div>
+      </template>
+    </template>
+
+    <!-- Rules Modal -->
+    <template if:true={showRulesModal}>
+      <div
+        class="fhc-modal-backdrop"
+        onclick={closeRulesModal}
+        role="presentation"
+      >
+        <div
+          class="fhc-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fhc-modal-title"
+          onclick={stopPropagation}
+        >
+          <div class="fhc-modal-header">
+            <h2 class="fhc-modal-title" id="fhc-modal-title">
+              📋 Flow Health Rules
+            </h2>
+            <button
+              class="fhc-modal-close"
+              onclick={closeRulesModal}
+              aria-label="Close rules modal"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="fhc-modal-body">
+            <table
+              class="fhc-rules-table"
+              aria-label="List of all Flow Health Checker scan rules"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">Rule</th>
+                  <th scope="col">Severity</th>
+                  <th scope="col">Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template for:each={rulesList} for:item="rule">
+                  <tr key={rule.label}>
+                    <td class="fhc-rule-name">{rule.label}</td>
+                    <td>
+                      <span
+                        class={rule.badgeClass}
+                        aria-label="Severity: {rule.severity}"
+                      >
+                        {rule.severityIcon} {rule.severity}
+                      </span>
+                    </td>
+                    <td class="fhc-desc-cell">{rule.description}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template if:true={showHistoryModal}>
+      <div
+        class="fhc-modal-backdrop"
+        onclick={closeHistoryModal}
+        role="presentation"
+      >
+        <div
+          class="fhc-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fhc-history-title"
+          onclick={stopPropagation}
+        >
+          <div class="fhc-modal-header">
+            <h2 class="fhc-modal-title" id="fhc-history-title">
+              📈 Health Score Trend
+            </h2>
+            <button
+              class="fhc-modal-close"
+              onclick={closeHistoryModal}
+              aria-label="Close history modal"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="fhc-modal-body">
+            <div
+              class="fhc-trend-chart"
+              role="img"
+              aria-label="Health score over the last {historyList.length} scans"
+            >
+              <template for:each={historyList} for:item="row">
+                <div key={row.id} class="fhc-trend-col">
+                  <div
+                    class={row.barClass}
+                    style={row.barStyle}
+                    title={row.score}
+                  ></div>
+                  <span class="fhc-trend-label">{row.date}</span>
+                </div>
+              </template>
+            </div>
+            <table class="fhc-rules-table" aria-label="Scan history detail">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Flows</th>
+                  <th>Errors</th>
+                  <th>Warnings</th>
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template for:each={historyList} for:item="row">
+                  <tr key={row.id}>
+                    <td>{row.date}</td>
+                    <td>{row.totalFlows}</td>
+                    <td>{row.errors}</td>
+                    <td>{row.warnings}</td>
+                    <td>{row.score}%</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>

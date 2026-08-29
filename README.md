@@ -1,7 +1,7 @@
 # ⚡ Flow Health Checker
 
 [![Salesforce Managed Package](https://img.shields.io/badge/Salesforce-2GP%20Managed%20Package-blue.svg)](https://developer.salesforce.com/)
-[![API Version](https://img.shields.io/badge/API%20Version-61.0%20(Summer%20'24)-brightgreen.svg)](https://developer.salesforce.com/)
+[![API Version](<https://img.shields.io/badge/API%20Version-61.0%20(Summer%20'24)-brightgreen.svg>)](https://developer.salesforce.com/)
 [![Namespace](https://img.shields.io/badge/Namespace-svfhc-orange.svg)](https://developer.salesforce.com/)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
@@ -46,20 +46,20 @@ flowchart LR
 
 ## 📋 Built-In Flow Inspection Rules
 
-| Rule | Severity | Rationale & Detection |
-|---|---|---|
-| **DML In Loop** | `🔴 Error` | Flags DML statements (`Create`, `Update`, `Delete`) and `Lookup` operations inside loops that risk hitting the 150 DML / 100 SOQL limits. |
-| **No Fault Path** | `🔴 Error` | Detects DML/Callout elements without fault connectors, preventing unhandled runtime exceptions from crashing user transactions. |
-| **Hardcoded Id** | `🔴 Error` | Identifies hardcoded 15- and 18-character Salesforce record IDs that cause cross-environment deployment failures. |
-| **Recursive Subflow** | `🔴 Error` | Detects subflow elements that call their own parent flow directly, causing infinite loops and CPU timeouts. |
-| **Duplicate DML on Same Object** | `🟡 Warning` | Flags multiple separate DML statements on the same SObject outside of loops, suggesting collection-based batching instead. |
-| **Hardcoded URL** | `🟡 Warning` | Scans for hardcoded external HTTP/HTTPS URLs; recommends Named Credentials or Custom Labels. |
-| **Missing Description** | `🟡 Warning` | Flags flows with blank descriptions to improve documentation and team maintainability. |
-| **No Trigger Configuration** | `🟡 Warning` | Flags record-triggered flows missing a target SObject on the Start element. |
-| **Too Many Elements** | `🟡 Warning` | Flags flows with $>30$ elements to encourage modular subflow decomposition. |
-| **Too Many Screen Fields** | `🟡 Warning` | Flags screen flow nodes with $>10$ fields that degrade user experience and form completion rates. |
-| **Unconnected Element** | `🟡 Warning` | Detects unreachable orphan flow elements and dead code disconnected from the Start element. |
-| **Unused Variable** | `🟡 Warning` | Identifies non-input/output variables that are never referenced in any flow node. |
+| Rule                             | Severity     | Rationale & Detection                                                                                                                     |
+| -------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **DML In Loop**                  | `🔴 Error`   | Flags DML statements (`Create`, `Update`, `Delete`) and `Lookup` operations inside loops that risk hitting the 150 DML / 100 SOQL limits. |
+| **No Fault Path**                | `🔴 Error`   | Detects DML/Callout elements without fault connectors, preventing unhandled runtime exceptions from crashing user transactions.           |
+| **Hardcoded Id**                 | `🔴 Error`   | Identifies hardcoded 15- and 18-character Salesforce record IDs that cause cross-environment deployment failures.                         |
+| **Recursive Subflow**            | `🔴 Error`   | Detects subflow elements that call their own parent flow directly, causing infinite loops and CPU timeouts.                               |
+| **Duplicate DML on Same Object** | `🟡 Warning` | Flags multiple separate DML statements on the same SObject outside of loops, suggesting collection-based batching instead.                |
+| **Hardcoded URL**                | `🟡 Warning` | Scans for hardcoded external HTTP/HTTPS URLs; recommends Named Credentials or Custom Labels.                                              |
+| **Missing Description**          | `🟡 Warning` | Flags flows with blank descriptions to improve documentation and team maintainability.                                                    |
+| **No Trigger Configuration**     | `🟡 Warning` | Flags record-triggered flows missing a target SObject on the Start element.                                                               |
+| **Too Many Elements**            | `🟡 Warning` | Flags flows with $>30$ elements to encourage modular subflow decomposition.                                                               |
+| **Too Many Screen Fields**       | `🟡 Warning` | Flags screen flow nodes with $>10$ fields that degrade user experience and form completion rates.                                         |
+| **Unconnected Element**          | `🟡 Warning` | Detects unreachable orphan flow elements and dead code disconnected from the Start element.                                               |
+| **Unused Variable**              | `🟡 Warning` | Identifies non-input/output variables that are never referenced in any flow node.                                                         |
 
 ---
 
@@ -117,16 +117,20 @@ force-app/main/default/
 ## 🚀 Installation & Getting Started
 
 ### 1. Install Managed Package
+
 Install the package into your Salesforce org via web browser:
-🔗 **[Direct Installation Link (v0.8.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o5MHQAY)**
+🔗 **[Direct Installation Link (v0.9.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6gXQAQ)**
 
 Or install via Salesforce CLI:
+
 ```bash
-sf package install --package "04tdL000000o5MHQAY" --wait 10 --target-org my-target-org
+sf package install --package "04tdL000000o6gXQAQ" --wait 10 --target-org my-target-org
 ```
 
 ### 2. Assign Permissions
+
 The post-install script automatically assigns `FHC_Admin` to the installing user. To assign permissions to other administrators or auditors:
+
 ```bash
 # For Administrators (run scans, manage rules):
 sf org assign permset --name svfhc__FHC_Admin --target-org my-target-org
@@ -136,6 +140,7 @@ sf org assign permset --name svfhc__FHC_Viewer --target-org my-target-org
 ```
 
 ### 3. Open the App
+
 1. Navigate to the Salesforce **App Launcher** (3x3 grid icon).
 2. Search for **Flow Health Checker**.
 3. Click **Run Scan** to perform an instant health audit of all active flows.
@@ -145,10 +150,12 @@ sf org assign permset --name svfhc__FHC_Viewer --target-org my-target-org
 ## 🛠️ Local Development & Testing
 
 ### Prerequisites
+
 - [Salesforce CLI (`sf`)](https://developer.salesforce.com/tools/salesforcecli)
 - [Node.js & npm](https://nodejs.org/)
 
 ### Setup Scratch Org
+
 ```bash
 # 1. Clone repository
 git clone https://github.com/sourav-the-ace/FlowHealthChecker.git
@@ -168,6 +175,9 @@ sf org assign permset --name FHC_Admin
 
 # 6. Run Apex unit tests
 sf apex test run --code-coverage --result-format human
+
+# 7. Run LWC Jest unit tests
+npm run test:unit
 ```
 
 ---
