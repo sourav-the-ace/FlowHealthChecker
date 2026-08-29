@@ -234,6 +234,25 @@ private class FlowRulesTest {
     );
   }
 
+  // ── SubflowFaultPathRule ─────────────────────────────────────
+
+  @isTest
+  static void testSubflowFaultPathRule_ReturnsNoViolations() {
+    FlowWrapper flow = makeFlow();
+    FlowWrapper.FlowElementWrapper sf = new FlowWrapper.FlowElementWrapper();
+    sf.name = 'Test_Subflow';
+    sf.elementType = 'Subflow';
+    sf.hasFaultConnector = false;
+    flow.subflows.add(sf);
+
+    SubflowFaultPathRule rule = new SubflowFaultPathRule();
+    System.assertEquals(
+      0,
+      rule.evaluate(flow).size(),
+      'Should return no violations as rule is deactivated'
+    );
+  }
+
   // ── NoTriggerConfigRule ──────────────────────────────────────
 
   @isTest

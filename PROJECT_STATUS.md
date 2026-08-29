@@ -4,8 +4,8 @@
 > **Namespace**: `svfhc`  
 > **Package Type**: Salesforce 2GP Managed Package  
 > **Source API Version**: `61.0` (Summer '24)  
-> **Current Version**: `0.9.0` (Package Id: `0HodL0000005NNNSA2`, Released Version Id: `04tdL000000o6gXQAQ`, Alias: `Flow Health Checker@0.9.0-1`)  
-> **Installation URL**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6gXQAQ`  
+> **Current Version**: `0.10.0` (Package Id: `0HodL0000005NNNSA2`, Released Version Id: `04tdL000000o6mzQAA`, Alias: `Flow Health Checker@0.10.0-1`)  
+> **Installation URL**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6mzQAA`  
 > **Target Audience**: Salesforce Developers, Technical Architects, AppExchange Reviewers, and Maintainers.
 
 ---
