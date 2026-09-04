@@ -259,6 +259,11 @@ $$\text{Health Score} = \max\left(0,\, \text{round}\left(100 - \text{Error Point
 - App Page: `Flow_Health_Checker.flexipage-meta.xml` hosting `c-flow-health-checker`.
 - Custom Tab: `Flow_Health_Checker.tab-meta.xml`.
 
+### 8.4 AppExchange Security Review Compliance
+
+- Comprehensive security review audit and policy checklist documented in 👉 **[`APPEXCHANGE_SECURITY_REVIEW.md`](./APPEXCHANGE_SECURITY_REVIEW.md)**.
+- Covers CRUD/FLS validation, `with sharing` architecture, SOQL/XSS/CSRF injection protection, in-memory session handling, Tooling API callout loopbacks, and least-privilege permission sets.
+
 ---
 
 ## 9. Test Suite & Mock Architecture

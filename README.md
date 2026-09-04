@@ -119,12 +119,12 @@ force-app/main/default/
 ### 1. Install Managed Package
 
 Install the package into your Salesforce org via web browser:
-🔗 **[Direct Installation Link (v0.11.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6obQAA)**
+🔗 **[Direct Installation Link (v0.10.0)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tdL000000o6mzQAA)**
 
 Or install via Salesforce CLI:
 
 ```bash
-sf package install --package "04tdL000000o6obQAA" --wait 10 --target-org my-target-org
+sf package install --package "04tdL000000o6mzQAA" --wait 10 --target-org my-target-org
 ```
 
 ### 2. Assign Permissions
@@ -182,11 +182,10 @@ npm run test:unit
 
 ---
 
-## 📖 In-Depth Project Documentation
+## 📖 In-Depth Project Documentation & Security Review
 
-For a complete technical breakdown, detailed rule specifications, architecture diagrams, test mock details, and the exhaustive **Gap Analysis & Next Steps**, see:
-
-👉 **[PROJECT_STATUS.md](./PROJECT_STATUS.md)**
+- 📑 **[PROJECT_STATUS.md](./PROJECT_STATUS.md)**: Complete technical breakdown, detailed rule specifications, architecture diagrams, test mock details, and exhaustive gap analysis.
+- 🛡️ **[APPEXCHANGE_SECURITY_REVIEW.md](./APPEXCHANGE_SECURITY_REVIEW.md)**: Official Salesforce AppExchange Security Review compliance guide, category-by-category security checklist, and reviewer justifications.
 
 ---
 
